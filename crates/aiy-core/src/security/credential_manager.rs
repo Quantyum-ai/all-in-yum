@@ -20,7 +20,7 @@ use aes_gcm::{
     Aes256Gcm, Nonce,
 };
 use argon2::{password_hash::SaltString, Argon2};
-use keyring::Entry;
+use keyring::{Entry, Error as KeyringError};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -40,6 +40,9 @@ const TAG_SIZE: usize = 16;
 
 /// Minimum valid ciphertext size (nonce + tag, no plaintext)
 const MIN_CIPHERTEXT_SIZE: usize = NONCE_SIZE + TAG_SIZE;
+
+const KEYCHAIN_SERVICE: &str = "aiy";
+const KEYCHAIN_PROVIDER_INDEX_USER: &str = "__providers__";
 
 /// Argon2 memory cost in KiB (64 MiB)
 const ARGON2_MEMORY_COST: u32 = 65536;
@@ -211,11 +214,8 @@ impl CredentialManager {
                 salt_path
             }
             CredentialBackend::SystemKeychain => {
-                // Use a default location for system keychain
-                dirs::config_dir()
-                    .unwrap_or_else(|| PathBuf::from("."))
-                    .join("aiy")
-                    .join(".salt")
+                // System keychain does not use a user-supplied master password.
+                PathBuf::new()
             }
             CredentialBackend::SecretManager { .. } => {
                 // Secret manager handles its own key management
@@ -223,12 +223,20 @@ impl CredentialManager {
             }
         };
 
-        Ok(Self {
+        let manager = Self {
             backend,
             master_key: None,
             salt_path,
             credentials_cache: HashMap::new(),
-        })
+        };
+
+        // Best-effort probe: fail fast if system keychain is not accessible so callers can
+        // fall back to the encrypted-file backend.
+        if manager.backend == CredentialBackend::SystemKeychain {
+            manager.probe_system_keychain()?;
+        }
+
+        Ok(manager)
     }
 
     /// Unlock the credential manager with a password.
@@ -246,6 +254,12 @@ impl CredentialManager {
     /// - Salt is unique per installation
     /// - Password is not stored
     pub fn unlock(&mut self, password: &str) -> Result<(), SecurityError> {
+        if self.backend == CredentialBackend::SystemKeychain {
+            // System keychain is protected by the OS/user session and does not require a master
+            // password for this credential manager.
+            return Ok(());
+        }
+
         let salt = self.load_or_create_salt(&self.salt_path.clone())?;
 
         // Configure Argon2id with secure parameters
@@ -300,13 +314,13 @@ impl CredentialManager {
     ///
     /// Returns `SecurityError::ManagerLocked` if the manager is not unlocked.
     pub fn store_key(&mut self, provider: &str, key: &str) -> Result<(), SecurityError> {
-        let master_key = self
-            .master_key
-            .as_ref()
-            .ok_or(SecurityError::ManagerLocked)?;
-
         match &self.backend {
             CredentialBackend::EncryptedFile { .. } => {
+                let master_key = self
+                    .master_key
+                    .as_ref()
+                    .ok_or(SecurityError::ManagerLocked)?;
+
                 // Encrypt and store in file
                 let encrypted = self.encrypt(key.as_bytes(), master_key)?;
                 self.credentials_cache
@@ -320,13 +334,11 @@ impl CredentialManager {
             }
             CredentialBackend::SystemKeychain => {
                 // Store in system keychain
-                let entry = Entry::new("aiy", provider)
-                    .map_err(|e| SecurityError::KeyringError(e.to_string()))?;
+                let entry = Self::keychain_entry(provider)?;
                 entry
                     .set_password(key)
                     .map_err(|e| SecurityError::KeyringError(e.to_string()))?;
-                self.credentials_cache
-                    .insert(provider.to_string(), key.to_string());
+                self.keychain_add_provider(provider)?;
             }
             CredentialBackend::SecretManager { provider: _, .. } => {
                 todo!("Secret manager auth/storage")
@@ -351,17 +363,26 @@ impl CredentialManager {
     /// - `SecurityError::ManagerLocked` if not unlocked
     /// - `SecurityError::CredentialNotFound` if the provider has no stored key
     pub fn get_key(&self, provider: &str) -> Result<String, SecurityError> {
-        let _master_key = self
-            .master_key
-            .as_ref()
-            .ok_or(SecurityError::ManagerLocked)?;
-
         match &self.backend {
-            CredentialBackend::EncryptedFile { .. } | CredentialBackend::SystemKeychain => self
-                .credentials_cache
-                .get(provider)
-                .cloned()
-                .ok_or_else(|| SecurityError::CredentialNotFound(provider.to_string())),
+            CredentialBackend::EncryptedFile { .. } => {
+                if self.master_key.is_none() {
+                    return Err(SecurityError::ManagerLocked);
+                }
+                self.credentials_cache
+                    .get(provider)
+                    .cloned()
+                    .ok_or_else(|| SecurityError::CredentialNotFound(provider.to_string()))
+            }
+            CredentialBackend::SystemKeychain => {
+                let entry = Self::keychain_entry(provider)?;
+                match entry.get_password() {
+                    Ok(value) => Ok(value),
+                    Err(KeyringError::NoEntry) => {
+                        Err(SecurityError::CredentialNotFound(provider.to_string()))
+                    }
+                    Err(e) => Err(SecurityError::KeyringError(e.to_string())),
+                }
+            }
             CredentialBackend::SecretManager { provider: _, .. } => {
                 todo!("Secret manager auth/storage")
             }
@@ -604,7 +625,11 @@ impl CredentialManager {
 
     /// Check if the manager is currently unlocked.
     pub fn is_unlocked(&self) -> bool {
-        self.master_key.is_some()
+        match &self.backend {
+            CredentialBackend::EncryptedFile { .. } => self.master_key.is_some(),
+            CredentialBackend::SystemKeychain => true,
+            CredentialBackend::SecretManager { .. } => true,
+        }
     }
 
     /// Get the configured backend.
@@ -614,21 +639,31 @@ impl CredentialManager {
 
     /// List all stored provider names.
     pub fn list_providers(&self) -> Result<Vec<String>, SecurityError> {
-        if self.master_key.is_none() {
-            return Err(SecurityError::ManagerLocked);
+        match &self.backend {
+            CredentialBackend::EncryptedFile { .. } => {
+                if self.master_key.is_none() {
+                    return Err(SecurityError::ManagerLocked);
+                }
+                Ok(self.credentials_cache.keys().cloned().collect())
+            }
+            CredentialBackend::SystemKeychain => match self.keychain_load_provider_index() {
+                Ok(providers) => Ok(providers),
+                Err(SecurityError::SerializationError(_)) => Ok(Vec::new()),
+                Err(e) => Err(e),
+            },
+            CredentialBackend::SecretManager { .. } => {
+                todo!("Secret manager auth/storage")
+            }
         }
-
-        Ok(self.credentials_cache.keys().cloned().collect())
     }
 
     /// Delete a stored credential.
     pub fn delete_key(&mut self, provider: &str) -> Result<(), SecurityError> {
-        if self.master_key.is_none() {
-            return Err(SecurityError::ManagerLocked);
-        }
-
         match &self.backend {
             CredentialBackend::EncryptedFile { .. } => {
+                if self.master_key.is_none() {
+                    return Err(SecurityError::ManagerLocked);
+                }
                 if self.credentials_cache.remove(provider).is_some() {
                     self.save_encrypted_keys()?;
                     Ok(())
@@ -637,18 +672,104 @@ impl CredentialManager {
                 }
             }
             CredentialBackend::SystemKeychain => {
-                let entry = Entry::new("aiy", provider)
-                    .map_err(|e| SecurityError::KeyringError(e.to_string()))?;
-                entry
-                    .delete_password()
-                    .map_err(|e: keyring::Error| SecurityError::KeyringError(e.to_string()))?;
-                self.credentials_cache.remove(provider);
-                Ok(())
+                let entry = Self::keychain_entry(provider)?;
+                match entry.delete_password() {
+                    Ok(()) => {
+                        self.keychain_remove_provider(provider)?;
+                        Ok(())
+                    }
+                    Err(KeyringError::NoEntry) => {
+                        // Best-effort repair of the provider index.
+                        let _ = self.keychain_remove_provider(provider);
+                        Err(SecurityError::CredentialNotFound(provider.to_string()))
+                    }
+                    Err(e) => Err(SecurityError::KeyringError(e.to_string())),
+                }
             }
             CredentialBackend::SecretManager { .. } => {
                 todo!("Secret manager auth/storage")
             }
         }
+    }
+}
+
+impl CredentialManager {
+    fn keychain_entry(user: &str) -> Result<Entry, SecurityError> {
+        Entry::new(KEYCHAIN_SERVICE, user).map_err(|e| SecurityError::KeyringError(e.to_string()))
+    }
+
+    fn probe_system_keychain(&self) -> Result<(), SecurityError> {
+        let entry = Self::keychain_entry(KEYCHAIN_PROVIDER_INDEX_USER)?;
+        match entry.get_password() {
+            Ok(_) => Ok(()),
+            Err(KeyringError::NoEntry) => Ok(()),
+            Err(e) => Err(SecurityError::KeyringError(e.to_string())),
+        }
+    }
+
+    fn keychain_load_provider_index(&self) -> Result<Vec<String>, SecurityError> {
+        let entry = Self::keychain_entry(KEYCHAIN_PROVIDER_INDEX_USER)?;
+        match entry.get_password() {
+            Ok(raw) => {
+                let mut providers: Vec<String> = serde_json::from_str(&raw)
+                    .map_err(|e| SecurityError::SerializationError(e.to_string()))?;
+                providers.sort();
+                providers.dedup();
+                Ok(providers)
+            }
+            Err(KeyringError::NoEntry) => Ok(Vec::new()),
+            Err(e) => Err(SecurityError::KeyringError(e.to_string())),
+        }
+    }
+
+    fn keychain_save_provider_index(&self, providers: &[String]) -> Result<(), SecurityError> {
+        let entry = Self::keychain_entry(KEYCHAIN_PROVIDER_INDEX_USER)?;
+        if providers.is_empty() {
+            match entry.delete_password() {
+                Ok(()) => Ok(()),
+                Err(KeyringError::NoEntry) => Ok(()),
+                Err(e) => Err(SecurityError::KeyringError(e.to_string())),
+            }
+        } else {
+            let raw = serde_json::to_string(providers)
+                .map_err(|e| SecurityError::SerializationError(e.to_string()))?;
+            entry
+                .set_password(&raw)
+                .map_err(|e| SecurityError::KeyringError(e.to_string()))
+        }
+    }
+
+    fn keychain_add_provider(&self, provider: &str) -> Result<(), SecurityError> {
+        let mut providers = match self.keychain_load_provider_index() {
+            Ok(providers) => providers,
+            Err(SecurityError::SerializationError(_)) => Vec::new(),
+            Err(e) => return Err(e),
+        };
+
+        if !providers.iter().any(|p| p == provider) {
+            providers.push(provider.to_string());
+            providers.sort();
+            providers.dedup();
+            self.keychain_save_provider_index(&providers)?;
+        }
+
+        Ok(())
+    }
+
+    fn keychain_remove_provider(&self, provider: &str) -> Result<(), SecurityError> {
+        let mut providers = match self.keychain_load_provider_index() {
+            Ok(providers) => providers,
+            Err(SecurityError::SerializationError(_)) => Vec::new(),
+            Err(e) => return Err(e),
+        };
+
+        let initial_len = providers.len();
+        providers.retain(|p| p != provider);
+        if providers.len() != initial_len {
+            self.keychain_save_provider_index(&providers)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -663,6 +784,11 @@ impl Drop for CredentialManager {
 mod tests {
     use super::*;
     use tempfile::TempDir;
+
+    use keyring::credential::{Credential, CredentialApi, CredentialBuilderApi};
+    use keyring::{set_default_credential_builder, Error as KeyringError, Result as KeyringResult};
+    use std::any::Any;
+    use std::sync::{Arc, Mutex, OnceLock};
 
     fn create_test_manager() -> (CredentialManager, TempDir) {
         let temp_dir = TempDir::new().unwrap();
@@ -846,5 +972,133 @@ mod tests {
         let metadata = fs::metadata(&cred_path).unwrap();
         let permissions = metadata.permissions();
         assert_eq!(permissions.mode() & 0o777, 0o600);
+    }
+
+    type InMemoryKey = (Option<String>, String, String);
+
+    #[derive(Clone)]
+    struct InMemoryCredentialBuilder {
+        store: Arc<Mutex<HashMap<InMemoryKey, String>>>,
+    }
+
+    struct InMemoryCredential {
+        store: Arc<Mutex<HashMap<InMemoryKey, String>>>,
+        key: InMemoryKey,
+    }
+
+    impl CredentialApi for InMemoryCredential {
+        fn set_password(&self, password: &str) -> KeyringResult<()> {
+            let mut store = self.store.lock().expect("in-memory keyring store poisoned");
+            store.insert(self.key.clone(), password.to_string());
+            Ok(())
+        }
+
+        fn get_password(&self) -> KeyringResult<String> {
+            let store = self.store.lock().expect("in-memory keyring store poisoned");
+            store
+                .get(&self.key)
+                .cloned()
+                .ok_or(KeyringError::NoEntry)
+        }
+
+        fn delete_password(&self) -> KeyringResult<()> {
+            let mut store = self.store.lock().expect("in-memory keyring store poisoned");
+            match store.remove(&self.key) {
+                Some(_) => Ok(()),
+                None => Err(KeyringError::NoEntry),
+            }
+        }
+
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+    }
+
+    impl CredentialBuilderApi for InMemoryCredentialBuilder {
+        fn build(
+            &self,
+            target: Option<&str>,
+            service: &str,
+            user: &str,
+        ) -> KeyringResult<Box<Credential>> {
+            Ok(Box::new(InMemoryCredential {
+                store: self.store.clone(),
+                key: (
+                    target.map(str::to_string),
+                    service.to_string(),
+                    user.to_string(),
+                ),
+            }))
+        }
+
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+    }
+
+    static KEYCHAIN_TEST_MUTEX: Mutex<()> = Mutex::new(());
+    static TEST_KEYRING_STORE: OnceLock<Arc<Mutex<HashMap<InMemoryKey, String>>>> = OnceLock::new();
+
+    fn install_in_memory_keyring() -> Arc<Mutex<HashMap<InMemoryKey, String>>> {
+        TEST_KEYRING_STORE
+            .get_or_init(|| {
+                let store = Arc::new(Mutex::new(HashMap::new()));
+                set_default_credential_builder(Box::new(InMemoryCredentialBuilder {
+                    store: store.clone(),
+                }));
+                store
+            })
+            .clone()
+    }
+
+    fn reset_in_memory_keyring(store: &Arc<Mutex<HashMap<InMemoryKey, String>>>) {
+        let mut store = store.lock().expect("in-memory keyring store poisoned");
+        store.clear();
+    }
+
+    #[test]
+    fn test_system_keychain_store_get_list_delete_without_unlock() {
+        let _guard = KEYCHAIN_TEST_MUTEX.lock().unwrap();
+        let store = install_in_memory_keyring();
+        reset_in_memory_keyring(&store);
+
+        let mut manager = CredentialManager::new(CredentialBackend::SystemKeychain).unwrap();
+        assert!(manager.is_unlocked());
+
+        manager.store_key("openai", "sk-test123").unwrap();
+        assert_eq!(manager.get_key("openai").unwrap(), "sk-test123");
+
+        let providers = manager.list_providers().unwrap();
+        assert_eq!(providers, vec!["openai".to_string()]);
+
+        manager.delete_key("openai").unwrap();
+        assert!(matches!(
+            manager.get_key("openai"),
+            Err(SecurityError::CredentialNotFound(_))
+        ));
+        assert!(manager.list_providers().unwrap().is_empty());
+
+        reset_in_memory_keyring(&store);
+    }
+
+    #[test]
+    fn test_system_keychain_persists_across_manager_instances() {
+        let _guard = KEYCHAIN_TEST_MUTEX.lock().unwrap();
+        let store = install_in_memory_keyring();
+        reset_in_memory_keyring(&store);
+
+        {
+            let mut manager = CredentialManager::new(CredentialBackend::SystemKeychain).unwrap();
+            manager.store_key("anthropic", "sk-ant-test").unwrap();
+        }
+
+        {
+            let manager = CredentialManager::new(CredentialBackend::SystemKeychain).unwrap();
+            assert_eq!(manager.get_key("anthropic").unwrap(), "sk-ant-test");
+            let providers = manager.list_providers().unwrap();
+            assert_eq!(providers, vec!["anthropic".to_string()]);
+        }
+
+        reset_in_memory_keyring(&store);
     }
 }

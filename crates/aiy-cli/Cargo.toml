@@ -1,0 +1,21 @@
+[package]
+name = "aiy-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "CLI for All-in-Yum AI adapter framework"
+
+[[bin]]
+name = "aiy"
+path = "src/main.rs"
+
+[dependencies]
+aiy-core = { path = "../aiy-core" }
+aiy-adapters = { path = "../aiy-adapters" }
+clap.workspace = true
+tokio.workspace = true
+anyhow.workspace = true
+rpassword.workspace = true
+dirs.workspace = true
