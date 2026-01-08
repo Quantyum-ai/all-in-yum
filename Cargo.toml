@@ -2,6 +2,7 @@
 members = [
     "crates/aiy-core",
     "crates/aiy-adapters",
+    "crates/aiy-adapter-grok",
 ]
 resolver = "2"
 
