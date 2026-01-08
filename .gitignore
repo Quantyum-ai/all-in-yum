@@ -1,0 +1,38 @@
+# Rust
+/target/
+**/*.rs.bk
+Cargo.lock
+
+# Local AI/IDE configurations
+.agent/
+.claude/
+.codex/
+.cursor/
+.opencode/
+.windsurf/
+.mcp.json
+_bmad/
+
+# IDE
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Credentials (NEVER commit these)
+*.enc
+*.salt
+credentials.json
+.env
+.env.*
+!.env.example
+
+# Test artifacts
+*.log
+/coverage/
+tarpaulin-report.html
+
+# Build artifacts
+*.so
+*.dylib
+*.dll

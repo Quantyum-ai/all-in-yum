@@ -1,0 +1,29 @@
+[package]
+name = "aiy-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Core library for All-in-Yum multi-agent consensus pipeline"
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+aes-gcm.workspace = true
+argon2.workspace = true
+rand.workspace = true
+zeroize.workspace = true
+keyring.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+regex.workspace = true
+once_cell.workspace = true
+unicode-normalization.workspace = true
+hex.workspace = true
+dirs.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
