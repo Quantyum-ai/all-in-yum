@@ -7,4 +7,4 @@
 
 pub mod traits;
 
-pub use traits::{AgentAdapter, AgentReview, Issue, Severity, Verdict};
+pub use traits::{AdapterError, AgentAdapter, AgentReview, Issue, Severity, Verdict};

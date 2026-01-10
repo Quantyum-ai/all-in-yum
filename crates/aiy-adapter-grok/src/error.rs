@@ -49,3 +49,24 @@ impl From<aiy_core::security::sanitization::SanitizationError> for GrokError {
         GrokError::SecurityValidation(err.to_string())
     }
 }
+
+impl GrokError {
+    /// Convert to a sanitized string that never exposes API keys or secrets.
+    ///
+    /// This method is used when converting to `AdapterError` for external consumers.
+    pub fn to_sanitized_string(&self) -> String {
+        match self {
+            // Credential errors - never expose the actual credential value
+            GrokError::Credential(_) => "Credential retrieval failed".to_string(),
+            // API errors - sanitize to avoid leaking keys in URLs/headers
+            GrokError::ApiRequest(_) => "API request failed".to_string(),
+            // These are generally safe to expose
+            GrokError::ResponseParsing(msg) => format!("Response parsing failed: {msg}"),
+            GrokError::SecurityValidation(msg) => format!("Security validation failed: {msg}"),
+            GrokError::SchemaValidation(msg) => format!("Schema validation failed: {msg}"),
+            GrokError::Transport(_) => "Transport error occurred".to_string(),
+            GrokError::Serialization(_) => "Serialization error".to_string(),
+            GrokError::Other(msg) => msg.clone(),
+        }
+    }
+}

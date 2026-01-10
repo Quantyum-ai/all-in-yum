@@ -15,7 +15,7 @@ pub use error::GrokError;
 pub use models::GrokModel;
 pub use types::{ChatMessage, ChatRequest, ChatResponse};
 
-use aiy_adapters::{AgentAdapter, AgentReview};
+use aiy_adapters::{AdapterError, AgentAdapter, AgentReview};
 use async_trait::async_trait;
 
 /// Grok adapter implementing the AgentAdapter trait
@@ -54,5 +54,12 @@ impl AgentAdapter for GrokAdapter {
 
     fn display_name(&self) -> &str {
         "Grok (xAI)"
+    }
+
+    async fn review_artifact(&self, artifact: &str) -> Result<AgentReview, AdapterError> {
+        self.client
+            .review_artifact(artifact)
+            .await
+            .map_err(|e| AdapterError::new(e.to_sanitized_string()))
     }
 }
