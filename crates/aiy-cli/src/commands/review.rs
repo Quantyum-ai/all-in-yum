@@ -44,8 +44,30 @@ pub struct ReviewArgs {
     pub format: OutputFormat,
 }
 
+/// Review command result indicating success or failure
+#[derive(Debug)]
+pub enum ReviewResult {
+    /// Review completed successfully
+    Success,
+    /// Review failed due to no reviews being completed (SECURITY: must exit non-zero)
+    NoReviews,
+    /// Review completed but consensus blocked the artifact
+    Blocked,
+}
+
+impl ReviewResult {
+    /// Convert to exit code for CLI
+    pub fn exit_code(&self) -> i32 {
+        match self {
+            ReviewResult::Success => 0,
+            ReviewResult::NoReviews => 1,  // SECURITY: Empty reviews = failure
+            ReviewResult::Blocked => 2,    // Blocked by consensus
+        }
+    }
+}
+
 /// Run the review command
-pub async fn run(args: ReviewArgs) -> anyhow::Result<()> {
+pub async fn run(args: ReviewArgs) -> anyhow::Result<ReviewResult> {
     // Validate file exists
     if !args.file.exists() {
         anyhow::bail!("File not found: {}", args.file.display());
@@ -134,13 +156,41 @@ pub async fn run(args: ReviewArgs) -> anyhow::Result<()> {
     pb.finish_with_message("Complete");
     println!();
 
+    // =========================================================================
+    // SECURITY GUARD: Empty reviews must NEVER result in exit code 0
+    //
+    // This is a critical security check. If no reviews were completed (due to
+    // agent failures, timeouts, or misconfiguration), we MUST NOT exit with
+    // success. This prevents the "vacuous truth" problem where zero reviewers
+    // agreeing could be misinterpreted as approval.
+    //
+    // Defense-in-depth: This check exists at the CLI layer in addition to
+    // the ConsensusEngine checks in aiy-consensus.
+    // =========================================================================
+    if reviews.is_empty() {
+        eprintln!(
+            "\n{}: {}",
+            "SECURITY".red().bold(),
+            "No reviews completed. Cannot determine safety."
+        );
+        eprintln!(
+            "{}",
+            "All configured agents failed to produce reviews.".red()
+        );
+        eprintln!(
+            "{}",
+            "This is treated as a BLOCK to prevent unreviewed code from passing.".red()
+        );
+        return Ok(ReviewResult::NoReviews);
+    }
+
     // Display results based on format
     match args.format {
         OutputFormat::Pretty => display_pretty_results(&reviews),
         OutputFormat::Json => display_json_results(&reviews)?,
     }
 
-    Ok(())
+    Ok(ReviewResult::Success)
 }
 
 /// Create adapters based on configuration and requested agents

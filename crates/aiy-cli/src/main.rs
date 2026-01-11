@@ -176,12 +176,25 @@ async fn main() -> anyhow::Result<()> {
                 OutputFormatArg::Json => commands::review::OutputFormat::Json,
             };
 
-            commands::review::run(commands::review::ReviewArgs {
+            let result = commands::review::run(commands::review::ReviewArgs {
                 file,
                 agents,
                 format: output_format,
             })
-            .await
+            .await?;
+
+            // Handle ReviewResult - non-zero exit codes for security failures
+            match result {
+                commands::review::ReviewResult::Success => Ok(()),
+                commands::review::ReviewResult::NoReviews => {
+                    // SECURITY: Exit with non-zero when no reviews completed
+                    std::process::exit(1);
+                }
+                commands::review::ReviewResult::Blocked => {
+                    // Consensus blocked the artifact
+                    std::process::exit(2);
+                }
+            }
         }
 
         Commands::Agents(cmd) => match cmd {
