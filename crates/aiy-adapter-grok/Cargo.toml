@@ -23,6 +23,7 @@ reqwest = { version = "0.12", features = ["json"], optional = true }
 [dev-dependencies]
 tempfile.workspace = true
 wiremock = "0.6"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
 [features]
 default = []

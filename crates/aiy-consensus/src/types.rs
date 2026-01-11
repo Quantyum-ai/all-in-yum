@@ -27,6 +27,17 @@ pub struct ConsensusResult {
 
 impl ConsensusResult {
     /// Create a new ConsensusResult from agent reviews and a voting decision.
+    ///
+    /// # Arguments
+    ///
+    /// * `final_verdict` - The consensus verdict determined by the voting strategy
+    /// * `agent_reviews` - All successful reviews from participating agents
+    /// * `reasoning` - Human-readable explanation of the consensus decision
+    ///
+    /// # Returns
+    ///
+    /// A fully populated `ConsensusResult` with calculated confidence,
+    /// dissenting agents, and aggregated issues.
     pub fn new(
         final_verdict: Verdict,
         agent_reviews: Vec<AgentReview>,
@@ -73,16 +84,28 @@ impl ConsensusResult {
     }
 
     /// Check if consensus was unanimous (no dissenting agents).
+    ///
+    /// # Returns
+    ///
+    /// `true` if all participating agents agreed with the final verdict.
     pub fn is_unanimous(&self) -> bool {
         self.dissenting_agents.is_empty()
     }
 
     /// Get the number of agents that participated.
+    ///
+    /// # Returns
+    ///
+    /// The total count of agents that provided successful reviews.
     pub fn agent_count(&self) -> usize {
         self.agent_reviews.len()
     }
 
     /// Get the number of agents that approved (Pass verdict).
+    ///
+    /// # Returns
+    ///
+    /// Count of agents whose verdict was `Verdict::Pass`.
     pub fn approval_count(&self) -> usize {
         self.agent_reviews
             .iter()
@@ -91,6 +114,10 @@ impl ConsensusResult {
     }
 
     /// Get the approval ratio (0.0 - 1.0).
+    ///
+    /// # Returns
+    ///
+    /// Ratio of approving agents to total agents. Returns 0.0 if no agents participated.
     pub fn approval_ratio(&self) -> f64 {
         if self.agent_reviews.is_empty() {
             return 0.0;
@@ -124,6 +151,10 @@ pub enum AgentOutcome {
 
 impl AgentOutcome {
     /// Get the agent ID from any outcome variant.
+    ///
+    /// # Returns
+    ///
+    /// The agent identifier regardless of whether the review succeeded or failed.
     pub fn agent_id(&self) -> &str {
         match self {
             AgentOutcome::Success(review) => &review.agent_id,
@@ -133,11 +164,19 @@ impl AgentOutcome {
     }
 
     /// Check if this outcome represents a successful review.
+    ///
+    /// # Returns
+    ///
+    /// `true` if the agent completed its review without error or timeout.
     pub fn is_success(&self) -> bool {
         matches!(self, AgentOutcome::Success(_))
     }
 
     /// Extract the review if successful, None otherwise.
+    ///
+    /// # Returns
+    ///
+    /// `Some(&AgentReview)` if the outcome is `Success`, `None` otherwise.
     pub fn review(&self) -> Option<&AgentReview> {
         match self {
             AgentOutcome::Success(review) => Some(review),

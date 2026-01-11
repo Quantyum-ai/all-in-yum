@@ -86,7 +86,7 @@ impl AgentAdapter for CodexAdapter {
         self.client
             .review_artifact(artifact)
             .await
-            .map_err(|e| AdapterError::new(e.to_sanitized_string()))
+            .map_err(|e| e.to_adapter_error())
     }
 }
 

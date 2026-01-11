@@ -2,6 +2,7 @@
 //!
 //! Provides the `aiy review <file>` command for reviewing code files using AI agents.
 
+use crate::registry::AGENTS;
 use aiy_adapters::{AgentAdapter, AgentReview, Severity, Verdict};
 use aiy_adapter_grok::{GrokAdapter, GrokClient};
 use aiy_core::security::{CredentialBackend, CredentialManager};
@@ -80,11 +81,14 @@ pub async fn run(args: ReviewArgs) -> anyhow::Result<()> {
     let adapters = create_adapters(&config, &requested_agents).await?;
 
     if adapters.is_empty() {
+        // Generate credential hints from registry
+        let hints: Vec<String> = AGENTS
+            .iter()
+            .map(|a| format!("aiy credentials set {:10} # for {}", a.credential_provider, a.display_name))
+            .collect();
         anyhow::bail!(
-            "No agents available. Set up credentials with:\n  \
-             aiy credentials set xai      # for Grok\n  \
-             aiy credentials set anthropic # for Claude\n  \
-             aiy credentials set google    # for Gemini"
+            "No agents available. Set up credentials with:\n  {}",
+            hints.join("\n  ")
         );
     }
 
@@ -140,39 +144,42 @@ pub async fn run(args: ReviewArgs) -> anyhow::Result<()> {
 }
 
 /// Create adapters based on configuration and requested agents
+///
+/// Iterates over the agent registry to create adapters for requested agents.
+/// Only agents with implemented adapters will be created.
 async fn create_adapters(
     config: &PipelineConfig,
     requested_agents: &[String],
 ) -> anyhow::Result<Vec<Box<dyn AgentAdapter>>> {
     let mut adapters: Vec<Box<dyn AgentAdapter>> = Vec::new();
 
-    // Try to create Grok adapter if requested
-    if requested_agents.contains(&"grok".to_string()) {
-        if let Ok(grok) = create_grok_adapter(config).await {
-            adapters.push(Box::new(grok));
+    // Iterate over registry to create adapters for requested agents
+    for agent in AGENTS {
+        if !requested_agents.contains(&agent.id.to_string()) {
+            continue;
+        }
+
+        // Create adapter based on agent ID
+        // Each agent has its own adapter creation function
+        match agent.id {
+            "grok" => {
+                if let Ok(grok) = create_grok_adapter(config).await {
+                    adapters.push(Box::new(grok));
+                }
+            }
+            // Future adapters: Add match arms for claude, gemini, codex when their
+            // adapter crates are implemented (aiy-adapter-claude, aiy-adapter-gemini,
+            // aiy-adapter-codex). Each should follow the same pattern as grok above.
+            _ => {
+                // Agent is registered but adapter not yet implemented
+                eprintln!(
+                    "{}: Adapter for '{}' not yet implemented",
+                    "Warning".yellow(),
+                    agent.display_name
+                );
+            }
         }
     }
-
-    // TODO: Add Claude adapter when Wave 1 merges
-    // if requested_agents.contains(&"claude".to_string()) {
-    //     if let Ok(claude) = create_claude_adapter(config).await {
-    //         adapters.push(Box::new(claude));
-    //     }
-    // }
-
-    // TODO: Add Gemini adapter when Wave 1 merges
-    // if requested_agents.contains(&"gemini".to_string()) {
-    //     if let Ok(gemini) = create_gemini_adapter(config).await {
-    //         adapters.push(Box::new(gemini));
-    //     }
-    // }
-
-    // TODO: Add Codex adapter when Wave 1 merges
-    // if requested_agents.contains(&"codex".to_string()) {
-    //     if let Ok(codex) = create_codex_adapter(config).await {
-    //         adapters.push(Box::new(codex));
-    //     }
-    // }
 
     Ok(adapters)
 }

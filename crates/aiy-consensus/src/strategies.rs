@@ -20,16 +20,42 @@ pub enum VotingStrategy {
 }
 
 /// Configuration for weighted voting.
+///
+/// Weighted voting allows different agents to have different influence on the
+/// final decision. Weights can be explicit (per-agent) or derived from agent
+/// confidence scores.
+///
+/// # Example
+///
+/// ```
+/// use aiy_consensus::WeightedConfig;
+/// use std::collections::HashMap;
+///
+/// // Trust Claude more than Grok
+/// let mut weights = HashMap::new();
+/// weights.insert("claude".to_string(), 2.0);
+/// weights.insert("grok".to_string(), 1.0);
+///
+/// let config = WeightedConfig {
+///     weights,
+///     threshold: 0.6,
+///     use_confidence_as_weight: false,
+/// };
+/// ```
 #[derive(Debug, Clone)]
 pub struct WeightedConfig {
     /// Explicit weights per agent ID. If not specified, uses confidence scores.
+    ///
+    /// Higher weights give an agent more influence on the final decision.
     pub weights: HashMap<String, f64>,
 
     /// Threshold for weighted pass (0.0 - 1.0). Default is 0.5.
+    ///
+    /// The weighted pass ratio must meet or exceed this threshold for a `Pass` verdict.
     pub threshold: f64,
 
     /// If true, use agent confidence scores when no explicit weight is set.
-    /// If false, treat missing weights as 1.0.
+    /// If false, treat missing weights as 1.0 (equal weight).
     pub use_confidence_as_weight: bool,
 }
 
@@ -45,6 +71,14 @@ impl Default for WeightedConfig {
 
 impl WeightedConfig {
     /// Create a new weighted config with custom threshold.
+    ///
+    /// # Arguments
+    ///
+    /// * `threshold` - The pass threshold (0.0 - 1.0)
+    ///
+    /// # Returns
+    ///
+    /// A `WeightedConfig` with confidence-based weights and the specified threshold.
     pub fn with_threshold(threshold: f64) -> Self {
         Self {
             threshold,
@@ -53,17 +87,71 @@ impl WeightedConfig {
     }
 
     /// Create a new weighted config with explicit agent weights.
+    ///
+    /// # Arguments
+    ///
+    /// * `weights` - Map of agent IDs to their voting weights
+    ///
+    /// # Returns
+    ///
+    /// A `WeightedConfig` with the specified weights and default threshold (0.5).
     pub fn with_weights(weights: HashMap<String, f64>) -> Self {
         Self {
             weights,
             ..Default::default()
         }
     }
+
+    /// Validate the weighted config, returning an error if invalid.
+    ///
+    /// Checks:
+    /// - All weights must be positive (> 0.0)
+    /// - Threshold must be between 0.0 and 1.0 (inclusive)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aiy_consensus::strategies::WeightedConfig;
+    /// use std::collections::HashMap;
+    ///
+    /// // Valid config
+    /// let config = WeightedConfig::with_threshold(0.5);
+    /// assert!(config.validate().is_ok());
+    ///
+    /// // Invalid: negative weight
+    /// let mut weights = HashMap::new();
+    /// weights.insert("agent".to_string(), -1.0);
+    /// let config = WeightedConfig::with_weights(weights);
+    /// assert!(config.validate().is_err());
+    /// ```
+    pub fn validate(&self) -> Result<(), &'static str> {
+        for (_agent_id, weight) in &self.weights {
+            if *weight <= 0.0 {
+                return Err("Weights must be positive");
+            }
+        }
+        if self.threshold < 0.0 || self.threshold > 1.0 {
+            return Err("Threshold must be between 0.0 and 1.0");
+        }
+        Ok(())
+    }
 }
 
 impl VotingStrategy {
     /// Decide the final verdict based on the voting strategy.
+    ///
+    /// # Security Note
+    ///
+    /// This method contains critical security logic: if no reviews are provided,
+    /// it **always returns `Verdict::Block`**, regardless of the voting strategy.
+    /// This prevents a dangerous scenario where zero reviews could be interpreted
+    /// as "unanimous agreement" (vacuous truth) and incorrectly pass a review.
+    ///
+    /// This is a defense-in-depth measure. The `ConsensusEngine` also validates
+    /// that there are adapters configured before calling this method.
     pub fn decide(&self, reviews: &[AgentReview]) -> Verdict {
+        // SECURITY: Empty reviews must always block. Never allow vacuous truth
+        // (i.e., "all zero reviewers agree" should not mean Pass).
         if reviews.is_empty() {
             return Verdict::Block;
         }
@@ -77,6 +165,15 @@ impl VotingStrategy {
     }
 
     /// Generate reasoning string explaining the decision.
+    ///
+    /// # Arguments
+    ///
+    /// * `reviews` - The agent reviews that were evaluated
+    /// * `verdict` - The final verdict that was decided
+    ///
+    /// # Returns
+    ///
+    /// A human-readable string explaining how the verdict was reached.
     pub fn generate_reasoning(&self, reviews: &[AgentReview], verdict: Verdict) -> String {
         if reviews.is_empty() {
             return "No reviews provided - cannot reach consensus.".to_string();
@@ -490,6 +587,124 @@ mod tests {
         );
     }
 
+    // =========================================================================
+    // SECURITY REGRESSION TESTS
+    //
+    // These tests document critical security invariants. They ensure that
+    // empty or missing reviews can NEVER result in a Pass verdict.
+    //
+    // Background: Without this protection, unanimous voting with zero reviews
+    // could be interpreted as "vacuous truth" (all zero reviewers agree),
+    // leading to an incorrect Pass verdict.
+    // =========================================================================
+
+    /// Security test: Unanimous strategy with empty reviews must return Block.
+    ///
+    /// This prevents the vacuous truth problem where "all zero reviewers agree"
+    /// could be misinterpreted as unanimous approval.
+    #[test]
+    fn test_security_unanimous_empty_reviews_returns_block() {
+        let empty_reviews: Vec<AgentReview> = vec![];
+        let verdict = VotingStrategy::Unanimous.decide(&empty_reviews);
+
+        assert_eq!(
+            verdict,
+            Verdict::Block,
+            "SECURITY: Unanimous strategy with empty reviews must Block, never Pass"
+        );
+    }
+
+    /// Security test: Majority strategy with empty reviews must return Block.
+    ///
+    /// Zero reviews means zero passes, which should never satisfy majority requirements.
+    #[test]
+    fn test_security_majority_empty_reviews_returns_block() {
+        let empty_reviews: Vec<AgentReview> = vec![];
+        let verdict = VotingStrategy::Majority.decide(&empty_reviews);
+
+        assert_eq!(
+            verdict,
+            Verdict::Block,
+            "SECURITY: Majority strategy with empty reviews must Block, never Pass"
+        );
+    }
+
+    /// Security test: Any strategy with empty reviews must return Block.
+    ///
+    /// Zero reviews means no agent passed, so Any-pass cannot be satisfied.
+    #[test]
+    fn test_security_any_empty_reviews_returns_block() {
+        let empty_reviews: Vec<AgentReview> = vec![];
+        let verdict = VotingStrategy::Any.decide(&empty_reviews);
+
+        assert_eq!(
+            verdict,
+            Verdict::Block,
+            "SECURITY: Any strategy with empty reviews must Block, never Pass"
+        );
+    }
+
+    /// Security test: Weighted strategy with empty reviews must return Block.
+    ///
+    /// Zero reviews means zero weighted passes, which should never meet threshold.
+    #[test]
+    fn test_security_weighted_empty_reviews_returns_block() {
+        let empty_reviews: Vec<AgentReview> = vec![];
+        let config = WeightedConfig::default();
+        let verdict = VotingStrategy::Weighted(config).decide(&empty_reviews);
+
+        assert_eq!(
+            verdict,
+            Verdict::Block,
+            "SECURITY: Weighted strategy with empty reviews must Block, never Pass"
+        );
+    }
+
+    /// Security test: Weighted strategy with custom threshold still blocks on empty.
+    ///
+    /// Even a threshold of 0.0 should not pass with zero reviews.
+    #[test]
+    fn test_security_weighted_zero_threshold_empty_reviews_returns_block() {
+        let empty_reviews: Vec<AgentReview> = vec![];
+        let config = WeightedConfig::with_threshold(0.0);
+        let verdict = VotingStrategy::Weighted(config).decide(&empty_reviews);
+
+        assert_eq!(
+            verdict,
+            Verdict::Block,
+            "SECURITY: Weighted with 0.0 threshold and empty reviews must Block, never Pass"
+        );
+    }
+
+    /// Security test: Verify the empty check happens before strategy-specific logic.
+    ///
+    /// This test ensures the empty reviews check is at the top of decide(),
+    /// providing defense-in-depth regardless of individual strategy implementations.
+    #[test]
+    fn test_security_empty_check_is_strategy_agnostic() {
+        let empty_reviews: Vec<AgentReview> = vec![];
+
+        // Test all strategy variants return Block for empty reviews
+        let strategies: Vec<VotingStrategy> = vec![
+            VotingStrategy::Unanimous,
+            VotingStrategy::Majority,
+            VotingStrategy::Any,
+            VotingStrategy::Weighted(WeightedConfig::default()),
+            VotingStrategy::Weighted(WeightedConfig::with_threshold(0.0)),
+            VotingStrategy::Weighted(WeightedConfig::with_threshold(1.0)),
+        ];
+
+        for strategy in strategies {
+            let verdict = strategy.decide(&empty_reviews);
+            assert_eq!(
+                verdict,
+                Verdict::Block,
+                "SECURITY: {:?} with empty reviews must Block",
+                strategy
+            );
+        }
+    }
+
     // Reasoning tests
     #[test]
     fn test_unanimous_reasoning_pass() {
@@ -518,5 +733,76 @@ mod tests {
 
         assert!(reasoning.contains("Majority consensus not reached"));
         assert!(reasoning.contains("1 of 3"));
+    }
+
+    // =========================================================================
+    // WeightedConfig validation tests
+    // =========================================================================
+
+    #[test]
+    fn test_weighted_config_validate_default_is_valid() {
+        let config = WeightedConfig::default();
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_weighted_config_validate_valid_threshold() {
+        // Valid thresholds: 0.0, 0.5, 1.0
+        assert!(WeightedConfig::with_threshold(0.0).validate().is_ok());
+        assert!(WeightedConfig::with_threshold(0.5).validate().is_ok());
+        assert!(WeightedConfig::with_threshold(1.0).validate().is_ok());
+    }
+
+    #[test]
+    fn test_weighted_config_validate_invalid_threshold_negative() {
+        let config = WeightedConfig::with_threshold(-0.1);
+        assert_eq!(
+            config.validate(),
+            Err("Threshold must be between 0.0 and 1.0")
+        );
+    }
+
+    #[test]
+    fn test_weighted_config_validate_invalid_threshold_above_one() {
+        let config = WeightedConfig::with_threshold(1.1);
+        assert_eq!(
+            config.validate(),
+            Err("Threshold must be between 0.0 and 1.0")
+        );
+    }
+
+    #[test]
+    fn test_weighted_config_validate_positive_weights() {
+        let mut weights = HashMap::new();
+        weights.insert("grok".to_string(), 1.0);
+        weights.insert("claude".to_string(), 2.5);
+        let config = WeightedConfig::with_weights(weights);
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_weighted_config_validate_zero_weight_invalid() {
+        let mut weights = HashMap::new();
+        weights.insert("grok".to_string(), 0.0);
+        let config = WeightedConfig::with_weights(weights);
+        assert_eq!(config.validate(), Err("Weights must be positive"));
+    }
+
+    #[test]
+    fn test_weighted_config_validate_negative_weight_invalid() {
+        let mut weights = HashMap::new();
+        weights.insert("claude".to_string(), -1.5);
+        let config = WeightedConfig::with_weights(weights);
+        assert_eq!(config.validate(), Err("Weights must be positive"));
+    }
+
+    #[test]
+    fn test_weighted_config_validate_mixed_weights_one_invalid() {
+        let mut weights = HashMap::new();
+        weights.insert("grok".to_string(), 1.0);
+        weights.insert("claude".to_string(), -0.5); // Invalid
+        weights.insert("gemini".to_string(), 2.0);
+        let config = WeightedConfig::with_weights(weights);
+        assert_eq!(config.validate(), Err("Weights must be positive"));
     }
 }

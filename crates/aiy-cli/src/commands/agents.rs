@@ -2,14 +2,14 @@
 //!
 //! Provides commands for listing, enabling, and disabling AI agents.
 
+use crate::registry::{self, AGENTS};
 use aiy_core::security::{CredentialBackend, CredentialManager};
 use aiy_core::PipelineConfig;
 use colored::*;
-use std::path::PathBuf;
 
-/// Agent status information
+/// Agent status information (runtime status, not static metadata)
 #[derive(Debug)]
-struct AgentInfo {
+struct AgentStatus {
     id: String,
     display_name: String,
     enabled: bool,
@@ -17,32 +17,25 @@ struct AgentInfo {
     credential_provider: String,
 }
 
-/// Get all known agents with their status
-fn get_agent_info(config: &PipelineConfig, manager: Option<&CredentialManager>) -> Vec<AgentInfo> {
-    let agents = vec![
-        ("grok", "Grok (xAI)", "xai"),
-        ("claude", "Claude (Anthropic)", "anthropic"),
-        ("gemini", "Gemini (Google)", "google"),
-        ("codex", "Codex (OpenAI)", "openai"),
-    ];
-
-    agents
-        .into_iter()
-        .map(|(id, display_name, provider)| {
-            let enabled = config.enabled_agents.contains(&id.to_string());
+/// Get all known agents with their runtime status
+fn get_agent_status(config: &PipelineConfig, manager: Option<&CredentialManager>) -> Vec<AgentStatus> {
+    AGENTS
+        .iter()
+        .map(|agent| {
+            let enabled = config.enabled_agents.contains(&agent.id.to_string());
             let has_credentials = manager
                 .map(|m| {
-                    m.get_key(provider).is_ok()
-                        || m.get_key(id).is_ok() // Check fallback
+                    m.get_key(agent.credential_provider).is_ok()
+                        || m.get_key(agent.id).is_ok() // Check fallback
                 })
                 .unwrap_or(false);
 
-            AgentInfo {
-                id: id.to_string(),
-                display_name: display_name.to_string(),
+            AgentStatus {
+                id: agent.id.to_string(),
+                display_name: agent.display_name.to_string(),
                 enabled,
                 has_credentials,
-                credential_provider: provider.to_string(),
+                credential_provider: agent.credential_provider.to_string(),
             }
         })
         .collect()
@@ -54,7 +47,7 @@ pub fn list() -> anyhow::Result<()> {
         .unwrap_or_else(|_| PipelineConfig::default());
 
     let manager = get_credential_manager(&config).ok();
-    let agents = get_agent_info(&config, manager.as_ref());
+    let agents = get_agent_status(&config, manager.as_ref());
 
     println!("\n{}", "Available Agents".cyan().bold());
     println!("{}", "================".cyan());
@@ -112,15 +105,14 @@ pub fn enable(name: String) -> anyhow::Result<()> {
     let config_path = PipelineConfig::config_path()?;
     let mut config = PipelineConfig::load(&config_path).unwrap_or_else(|_| PipelineConfig::default());
 
-    // Validate agent name
-    let valid_agents = ["grok", "claude", "gemini", "codex"];
-    if !valid_agents.contains(&name.as_str()) {
-        anyhow::bail!(
+    // Validate agent name using registry
+    let agent = registry::get_agent(&name).ok_or_else(|| {
+        anyhow::anyhow!(
             "Unknown agent '{}'. Valid agents are: {}",
             name,
-            valid_agents.join(", ")
-        );
-    }
+            registry::valid_agents_string()
+        )
+    })?;
 
     if config.enabled_agents.contains(&name) {
         println!("{} Agent '{}' is already enabled", "[Info]".cyan(), name);
@@ -136,19 +128,11 @@ pub fn enable(name: String) -> anyhow::Result<()> {
         name.white().bold()
     );
 
-    // Show credential hint
-    let provider = match name.as_str() {
-        "grok" => "xai",
-        "claude" => "anthropic",
-        "gemini" => "google",
-        "codex" => "openai",
-        _ => &name,
-    };
-
+    // Show credential hint using registry metadata
     println!(
         "\n{}: Set credentials with: {}",
         "Note".cyan(),
-        format!("aiy credentials set {}", provider).white()
+        format!("aiy credentials set {}", agent.credential_provider).white()
     );
 
     Ok(())
@@ -159,13 +143,12 @@ pub fn disable(name: String) -> anyhow::Result<()> {
     let config_path = PipelineConfig::config_path()?;
     let mut config = PipelineConfig::load(&config_path).unwrap_or_else(|_| PipelineConfig::default());
 
-    // Validate agent name
-    let valid_agents = ["grok", "claude", "gemini", "codex"];
-    if !valid_agents.contains(&name.as_str()) {
+    // Validate agent name using registry
+    if !registry::is_valid_agent(&name) {
         anyhow::bail!(
             "Unknown agent '{}'. Valid agents are: {}",
             name,
-            valid_agents.join(", ")
+            registry::valid_agents_string()
         );
     }
 
@@ -192,7 +175,7 @@ pub fn status() -> anyhow::Result<()> {
         .unwrap_or_else(|_| PipelineConfig::default());
 
     let manager = get_credential_manager(&config)?;
-    let agents = get_agent_info(&config, Some(&manager));
+    let agents = get_agent_status(&config, Some(&manager));
 
     println!("\n{}", "Agent Credential Status".cyan().bold());
     println!("{}", "=======================".cyan());
@@ -252,10 +235,13 @@ pub fn status() -> anyhow::Result<()> {
             "{}: No agents are ready. Set up credentials first:",
             "Note".yellow()
         );
-        println!("  aiy credentials set xai       # for Grok");
-        println!("  aiy credentials set anthropic # for Claude");
-        println!("  aiy credentials set google    # for Gemini");
-        println!("  aiy credentials set openai    # for Codex");
+        // Generate hints from registry
+        for agent in AGENTS {
+            println!(
+                "  aiy credentials set {:10} # for {}",
+                agent.credential_provider, agent.display_name
+            );
+        }
     }
 
     Ok(())
@@ -287,15 +273,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_get_agent_info_no_manager() {
+    fn test_get_agent_status_no_manager() {
         let config = PipelineConfig::default();
-        let agents = get_agent_info(&config, None);
+        let agents = get_agent_status(&config, None);
 
-        assert_eq!(agents.len(), 4);
-        assert!(agents.iter().any(|a| a.id == "grok"));
-        assert!(agents.iter().any(|a| a.id == "claude"));
-        assert!(agents.iter().any(|a| a.id == "gemini"));
-        assert!(agents.iter().any(|a| a.id == "codex"));
+        // Agent count should match registry
+        assert_eq!(agents.len(), AGENTS.len());
+
+        // All registry agents should be present
+        for reg_agent in AGENTS {
+            assert!(agents.iter().any(|a| a.id == reg_agent.id));
+        }
 
         // All should have no credentials without a manager
         for agent in &agents {
@@ -310,7 +298,7 @@ mod tests {
             ..Default::default()
         };
 
-        let agents = get_agent_info(&config, None);
+        let agents = get_agent_status(&config, None);
 
         let grok = agents.iter().find(|a| a.id == "grok").unwrap();
         assert!(grok.enabled);

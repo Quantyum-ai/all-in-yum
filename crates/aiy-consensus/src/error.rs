@@ -51,6 +51,16 @@ pub enum ConsensusError {
 
 impl ConsensusError {
     /// Create a new agent failure error.
+    ///
+    /// # Arguments
+    ///
+    /// * `agent_id` - Identifier of the agent that failed
+    /// * `message` - Error message (should be sanitized to avoid leaking secrets)
+    ///
+    /// # Security
+    ///
+    /// The message should never contain API keys, tokens, or other sensitive data.
+    /// Adapter implementations are responsible for sanitizing errors before calling this.
     pub fn agent_failure(agent_id: impl Into<String>, message: impl Into<String>) -> Self {
         Self::AgentFailure {
             agent_id: agent_id.into(),
@@ -59,6 +69,11 @@ impl ConsensusError {
     }
 
     /// Create a new agent timeout error.
+    ///
+    /// # Arguments
+    ///
+    /// * `agent_id` - Identifier of the agent that timed out
+    /// * `timeout_ms` - The timeout duration in milliseconds
     pub fn agent_timeout(agent_id: impl Into<String>, timeout_ms: u64) -> Self {
         Self::AgentTimeout {
             agent_id: agent_id.into(),

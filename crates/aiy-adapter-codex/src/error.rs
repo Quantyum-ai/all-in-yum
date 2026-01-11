@@ -1,5 +1,6 @@
 //! Error types for the Codex adapter
 
+use aiy_adapters::{AdapterError, AdapterErrorKind};
 use thiserror::Error;
 
 /// Errors that can occur when using the Codex adapter
@@ -12,6 +13,10 @@ pub enum CodexError {
     /// API request failed
     #[error("API request failed: {0}")]
     ApiRequest(String),
+
+    /// Rate limit exceeded
+    #[error("Rate limit exceeded: {0}")]
+    RateLimit(String),
 
     /// API response parsing failed
     #[error("Response parsing failed: {0}")]
@@ -28,6 +33,10 @@ pub enum CodexError {
     /// Transport error (mock or real HTTP)
     #[error("Transport error: {0}")]
     Transport(String),
+
+    /// Request timeout
+    #[error("Request timeout: {0}")]
+    Timeout(String),
 
     /// Serialization error
     #[error("Serialization error: {0}")]
@@ -51,6 +60,24 @@ impl From<aiy_core::security::sanitization::SanitizationError> for CodexError {
 }
 
 impl CodexError {
+    /// Get the error kind for this error.
+    ///
+    /// Maps internal error variants to the standardized `AdapterErrorKind`.
+    pub fn kind(&self) -> AdapterErrorKind {
+        match self {
+            CodexError::Credential(_) => AdapterErrorKind::Auth,
+            CodexError::ApiRequest(_) => AdapterErrorKind::Network,
+            CodexError::RateLimit(_) => AdapterErrorKind::RateLimit,
+            CodexError::ResponseParsing(_) => AdapterErrorKind::Parse,
+            CodexError::SecurityValidation(_) => AdapterErrorKind::Security,
+            CodexError::SchemaValidation(_) => AdapterErrorKind::Schema,
+            CodexError::Transport(_) => AdapterErrorKind::Network,
+            CodexError::Timeout(_) => AdapterErrorKind::Timeout,
+            CodexError::Serialization(_) => AdapterErrorKind::Parse,
+            CodexError::Other(_) => AdapterErrorKind::Unknown,
+        }
+    }
+
     /// Convert to a sanitized string that never exposes API keys or secrets.
     ///
     /// This method is used when converting to `AdapterError` for external consumers.
@@ -60,14 +87,21 @@ impl CodexError {
             CodexError::Credential(_) => "Credential retrieval failed".to_string(),
             // API errors - sanitize to avoid leaking keys in URLs/headers
             CodexError::ApiRequest(_) => "API request failed".to_string(),
+            CodexError::RateLimit(_) => "Rate limit exceeded".to_string(),
             // These are generally safe to expose
             CodexError::ResponseParsing(msg) => format!("Response parsing failed: {msg}"),
             CodexError::SecurityValidation(msg) => format!("Security validation failed: {msg}"),
             CodexError::SchemaValidation(msg) => format!("Schema validation failed: {msg}"),
             CodexError::Transport(_) => "Transport error occurred".to_string(),
+            CodexError::Timeout(_) => "Request timed out".to_string(),
             CodexError::Serialization(_) => "Serialization error".to_string(),
             CodexError::Other(msg) => msg.clone(),
         }
+    }
+
+    /// Convert to an `AdapterError` with appropriate kind and sanitized message.
+    pub fn to_adapter_error(&self) -> AdapterError {
+        AdapterError::new(self.kind(), self.to_sanitized_string())
     }
 }
 

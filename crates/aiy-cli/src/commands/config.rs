@@ -2,6 +2,7 @@
 //!
 //! Provides commands for viewing and modifying pipeline configuration.
 
+use crate::registry;
 use aiy_core::PipelineConfig;
 use colored::*;
 
@@ -45,12 +46,11 @@ pub fn set(key: String, value: String) -> anyhow::Result<()> {
 
         key if key.starts_with("default_models.") => {
             let agent = key.strip_prefix("default_models.").unwrap();
-            let valid_agents = ["grok", "claude", "gemini", "codex"];
-            if !valid_agents.contains(&agent) {
+            if !registry::is_valid_agent(agent) {
                 anyhow::bail!(
                     "Unknown agent '{}'. Valid agents: {}",
                     agent,
-                    valid_agents.join(", ")
+                    registry::valid_agents_string()
                 );
             }
             config.default_models.insert(agent.to_string(), value.clone());
@@ -58,12 +58,11 @@ pub fn set(key: String, value: String) -> anyhow::Result<()> {
 
         key if key.starts_with("base_urls.") => {
             let agent = key.strip_prefix("base_urls.").unwrap();
-            let valid_agents = ["grok", "claude", "gemini", "codex"];
-            if !valid_agents.contains(&agent) {
+            if !registry::is_valid_agent(agent) {
                 anyhow::bail!(
                     "Unknown agent '{}'. Valid agents: {}",
                     agent,
-                    valid_agents.join(", ")
+                    registry::valid_agents_string()
                 );
             }
             config.base_urls.insert(agent.to_string(), value.clone());
@@ -71,12 +70,11 @@ pub fn set(key: String, value: String) -> anyhow::Result<()> {
 
         key if key.starts_with("timeouts.") => {
             let agent = key.strip_prefix("timeouts.").unwrap();
-            let valid_agents = ["grok", "claude", "gemini", "codex"];
-            if !valid_agents.contains(&agent) {
+            if !registry::is_valid_agent(agent) {
                 anyhow::bail!(
                     "Unknown agent '{}'. Valid agents: {}",
                     agent,
-                    valid_agents.join(", ")
+                    registry::valid_agents_string()
                 );
             }
             let timeout: u64 = value.parse().map_err(|_| {

@@ -24,13 +24,14 @@ use keyring::{Entry, Error as KeyringError};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs;
-use std::path::PathBuf;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 #[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
+use std::os::unix::fs::OpenOptionsExt;
 
 /// Nonce size for AES-256-GCM (96 bits = 12 bytes)
 const NONCE_SIZE: usize = 12;
@@ -52,6 +53,107 @@ const ARGON2_TIME_COST: u32 = 3;
 
 /// Argon2 parallelism factor
 const ARGON2_PARALLELISM: u32 = 4;
+
+/// Write content to a file with secure permissions (0600) from creation.
+///
+/// # TOCTOU Mitigation
+///
+/// This function prevents a Time-Of-Check-Time-Of-Use race condition by creating
+/// the file with restrictive permissions atomically, rather than creating the file
+/// first and then setting permissions afterward. This eliminates the brief window
+/// where sensitive data could be world-readable.
+///
+/// ## Unix Implementation
+///
+/// Uses `OpenOptions::mode(0o600)` to set permissions at file creation time,
+/// ensuring no race condition window exists.
+///
+/// ## Windows Fallback
+///
+/// Windows does not support Unix file permissions. The file is created with
+/// default permissions. Callers should be aware that Windows ACLs are not
+/// modified by this function.
+///
+/// # Arguments
+///
+/// * `path` - The path where the file should be created
+/// * `content` - The content to write to the file
+///
+/// # Errors
+///
+/// Returns `std::io::Error` if file creation or writing fails.
+fn write_secure_file(path: &Path, content: &[u8]) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(path)?;
+        file.write_all(content)?;
+        file.sync_all()?;
+        Ok(())
+    }
+
+    #[cfg(not(unix))]
+    {
+        // Windows fallback: create file with default permissions
+        // Note: Windows ACLs are not modified; security depends on user account permissions
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(path)?;
+        file.write_all(content)?;
+        file.sync_all()?;
+        Ok(())
+    }
+}
+
+/// Atomically write content to a file with secure permissions.
+///
+/// # TOCTOU Mitigation
+///
+/// This function provides atomic file replacement by:
+/// 1. Writing to a temporary file with 0600 permissions from creation
+/// 2. Using `fs::rename()` to atomically replace the target file
+///
+/// This ensures that:
+/// - The target file is never in a partially-written state
+/// - Permissions are set correctly from the start (no race window)
+/// - On crash, either the old file or new file exists (not a corrupt hybrid)
+///
+/// ## Unix Implementation
+///
+/// Uses `OpenOptions::mode(0o600)` for the temp file, then atomic rename.
+///
+/// ## Windows Fallback
+///
+/// Windows does not support Unix file permissions. The file is created with
+/// default permissions. `fs::rename()` is used for atomic replacement.
+///
+/// # Arguments
+///
+/// * `path` - The final destination path
+/// * `content` - The content to write
+///
+/// # Errors
+///
+/// Returns `std::io::Error` if file creation, writing, or renaming fails.
+fn write_secure_file_atomic(path: &Path, content: &[u8]) -> std::io::Result<()> {
+    // Create temp file path in the same directory (ensures same filesystem for atomic rename)
+    let temp_path = path.with_extension("tmp");
+
+    // Write to temp file with secure permissions
+    write_secure_file(&temp_path, content)?;
+
+    // Atomically rename temp to final path
+    // This is atomic on POSIX systems and best-effort atomic on Windows
+    fs::rename(&temp_path, path)?;
+
+    Ok(())
+}
 
 /// Security-related errors
 #[derive(Debug, Error)]
@@ -142,6 +244,10 @@ pub enum CredentialBackend {
     /// Use the system's native keychain (macOS Keychain, Windows Credential Manager, Linux Secret Service)
     SystemKeychain,
     /// Use a cloud secret manager (AWS Secrets Manager, GCP Secret Manager, etc.)
+    ///
+    /// **Note:** This backend is not yet implemented. Operations will panic with `todo!()`.
+    /// Cloud KMS integration is planned for a future phase. The variant exists to allow
+    /// configuration to be forward-compatible.
     SecretManager {
         /// The cloud provider (aws, gcp, azure)
         provider: String,
@@ -341,7 +447,7 @@ impl CredentialManager {
                 self.keychain_add_provider(provider)?;
             }
             CredentialBackend::SecretManager { provider: _, .. } => {
-                todo!("Secret manager auth/storage")
+                todo!("SecretManager backend: Cloud KMS integration planned for future phase")
             }
         }
 
@@ -384,7 +490,7 @@ impl CredentialManager {
                 }
             }
             CredentialBackend::SecretManager { provider: _, .. } => {
-                todo!("Secret manager auth/storage")
+                todo!("SecretManager backend: Cloud KMS integration planned for future phase")
             }
         }
     }
@@ -486,6 +592,12 @@ impl CredentialManager {
     /// If the salt file exists, loads it. Otherwise, generates a new
     /// cryptographically secure salt and saves it with restrictive permissions.
     ///
+    /// # TOCTOU Mitigation
+    ///
+    /// Uses `write_secure_file()` to create the salt file with 0600 permissions
+    /// atomically at creation time, preventing any race condition window where
+    /// the salt could be world-readable.
+    ///
     /// # Arguments
     ///
     /// * `path` - Path to the salt file
@@ -512,16 +624,8 @@ impl CredentialManager {
                 fs::create_dir_all(parent)?;
             }
 
-            // Write salt to file
-            fs::write(path, salt.as_str())?;
-
-            // Set restrictive permissions (Unix only)
-            #[cfg(unix)]
-            {
-                let mut perms = fs::metadata(path)?.permissions();
-                perms.set_mode(0o600);
-                fs::set_permissions(path, perms)?;
-            }
+            // Write salt to file with secure permissions from creation (TOCTOU mitigation)
+            write_secure_file(path, salt.as_str().as_bytes())?;
 
             Ok(salt.to_string())
         }
@@ -533,6 +637,15 @@ impl CredentialManager {
     ///
     /// - Each credential is encrypted with a fresh random nonce
     /// - File permissions are set to 600 (owner read/write only) on Unix
+    ///
+    /// # TOCTOU Mitigation
+    ///
+    /// Uses `write_secure_file_atomic()` to:
+    /// 1. Write to a temporary file with 0600 permissions from creation
+    /// 2. Atomically rename to the final path
+    ///
+    /// This prevents both the race condition where credentials could be briefly
+    /// world-readable, and ensures the file is never in a partially-written state.
     pub fn save_encrypted_keys(&self) -> Result<(), SecurityError> {
         let master_key = self
             .master_key
@@ -560,16 +673,8 @@ impl CredentialManager {
                     fs::create_dir_all(parent)?;
                 }
 
-                // Write to file
-                fs::write(path, json)?;
-
-                // Set restrictive permissions (Unix only)
-                #[cfg(unix)]
-                {
-                    let mut perms = fs::metadata(path)?.permissions();
-                    perms.set_mode(0o600);
-                    fs::set_permissions(path, perms)?;
-                }
+                // Write atomically with secure permissions from creation (TOCTOU mitigation)
+                write_secure_file_atomic(path, json.as_bytes())?;
 
                 Ok(())
             }
@@ -578,7 +683,7 @@ impl CredentialManager {
                 Ok(())
             }
             CredentialBackend::SecretManager { .. } => {
-                todo!("Secret manager auth/storage")
+                todo!("SecretManager backend: Cloud KMS integration planned for future phase")
             }
         }
     }
@@ -618,7 +723,7 @@ impl CredentialManager {
                 Ok(())
             }
             CredentialBackend::SecretManager { .. } => {
-                todo!("Secret manager auth/storage")
+                todo!("SecretManager backend: Cloud KMS integration planned for future phase")
             }
         }
     }
@@ -652,7 +757,7 @@ impl CredentialManager {
                 Err(e) => Err(e),
             },
             CredentialBackend::SecretManager { .. } => {
-                todo!("Secret manager auth/storage")
+                todo!("SecretManager backend: Cloud KMS integration planned for future phase")
             }
         }
     }
@@ -687,7 +792,7 @@ impl CredentialManager {
                 }
             }
             CredentialBackend::SecretManager { .. } => {
-                todo!("Secret manager auth/storage")
+                todo!("SecretManager backend: Cloud KMS integration planned for future phase")
             }
         }
     }
@@ -789,6 +894,9 @@ mod tests {
     use keyring::{set_default_credential_builder, Error as KeyringError, Result as KeyringResult};
     use std::any::Any;
     use std::sync::{Arc, Mutex, OnceLock};
+
+    #[cfg(unix)]
+    use std::os::unix::fs::PermissionsExt;
 
     fn create_test_manager() -> (CredentialManager, TempDir) {
         let temp_dir = TempDir::new().unwrap();
@@ -972,6 +1080,129 @@ mod tests {
         let metadata = fs::metadata(&cred_path).unwrap();
         let permissions = metadata.permissions();
         assert_eq!(permissions.mode() & 0o777, 0o600);
+    }
+
+    /// Test that write_secure_file creates files with 0600 permissions atomically.
+    ///
+    /// This test verifies the TOCTOU mitigation by checking that the file is
+    /// created with correct permissions from the start, not chmod'd after creation.
+    #[cfg(unix)]
+    #[test]
+    fn test_secure_file_creation_toctou_mitigation() {
+        use std::os::unix::fs::MetadataExt;
+
+        let temp_dir = TempDir::new().unwrap();
+        let test_path = temp_dir.path().join("secure_test.txt");
+
+        // Write using our secure function
+        write_secure_file(&test_path, b"sensitive content").unwrap();
+
+        // Verify permissions are 0600
+        let metadata = fs::metadata(&test_path).unwrap();
+        let mode = metadata.mode() & 0o777;
+        assert_eq!(
+            mode, 0o600,
+            "File should have 0600 permissions, got {:o}",
+            mode
+        );
+
+        // Verify the content was written correctly
+        let content = fs::read_to_string(&test_path).unwrap();
+        assert_eq!(content, "sensitive content");
+    }
+
+    /// Test that write_secure_file_atomic creates files atomically with 0600 permissions.
+    ///
+    /// This test verifies:
+    /// 1. The final file has 0600 permissions from creation
+    /// 2. No temporary file is left behind after successful write
+    /// 3. The content is correct after atomic rename
+    #[cfg(unix)]
+    #[test]
+    fn test_secure_file_atomic_write_toctou_mitigation() {
+        use std::os::unix::fs::MetadataExt;
+
+        let temp_dir = TempDir::new().unwrap();
+        let test_path = temp_dir.path().join("atomic_test.enc");
+        let temp_path = test_path.with_extension("tmp");
+
+        // Write using atomic secure function
+        write_secure_file_atomic(&test_path, b"atomic sensitive content").unwrap();
+
+        // Verify final file has 0600 permissions
+        let metadata = fs::metadata(&test_path).unwrap();
+        let mode = metadata.mode() & 0o777;
+        assert_eq!(
+            mode, 0o600,
+            "Final file should have 0600 permissions, got {:o}",
+            mode
+        );
+
+        // Verify the content was written correctly
+        let content = fs::read_to_string(&test_path).unwrap();
+        assert_eq!(content, "atomic sensitive content");
+
+        // Verify no temp file is left behind
+        assert!(
+            !temp_path.exists(),
+            "Temporary file should be cleaned up after atomic rename"
+        );
+    }
+
+    /// Test that salt file is created with correct permissions on first unlock.
+    ///
+    /// This verifies the TOCTOU fix in load_or_create_salt().
+    #[cfg(unix)]
+    #[test]
+    fn test_salt_file_secure_creation() {
+        use std::os::unix::fs::MetadataExt;
+
+        let temp_dir = TempDir::new().unwrap();
+        let cred_path = temp_dir.path().join("credentials.enc");
+        let salt_path = temp_dir.path().join("credentials.salt");
+
+        // Salt file should not exist yet
+        assert!(!salt_path.exists());
+
+        // Create manager and unlock (this creates the salt file)
+        let mut manager = CredentialManager::new(CredentialBackend::EncryptedFile {
+            path: cred_path,
+        })
+        .unwrap();
+        manager.unlock("test-password").unwrap();
+
+        // Salt file should now exist with 0600 permissions
+        assert!(salt_path.exists(), "Salt file should be created on unlock");
+        let metadata = fs::metadata(&salt_path).unwrap();
+        let mode = metadata.mode() & 0o777;
+        assert_eq!(
+            mode, 0o600,
+            "Salt file should have 0600 permissions from creation, got {:o}",
+            mode
+        );
+    }
+
+    /// Test atomic write replaces existing file correctly.
+    #[cfg(unix)]
+    #[test]
+    fn test_atomic_write_replaces_existing() {
+        use std::os::unix::fs::MetadataExt;
+
+        let temp_dir = TempDir::new().unwrap();
+        let test_path = temp_dir.path().join("replace_test.enc");
+
+        // First write
+        write_secure_file_atomic(&test_path, b"original content").unwrap();
+        assert_eq!(fs::read_to_string(&test_path).unwrap(), "original content");
+
+        // Second write should replace atomically
+        write_secure_file_atomic(&test_path, b"updated content").unwrap();
+        assert_eq!(fs::read_to_string(&test_path).unwrap(), "updated content");
+
+        // Permissions should still be 0600
+        let metadata = fs::metadata(&test_path).unwrap();
+        let mode = metadata.mode() & 0o777;
+        assert_eq!(mode, 0o600);
     }
 
     type InMemoryKey = (Option<String>, String, String);

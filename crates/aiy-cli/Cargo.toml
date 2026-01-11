@@ -11,6 +11,10 @@ description = "CLI for All-in-Yum AI adapter framework"
 name = "aiy"
 path = "src/main.rs"
 
+[features]
+default = []
+http = ["aiy-adapter-grok/http"]
+
 [dependencies]
 aiy-core = { path = "../aiy-core" }
 aiy-adapters = { path = "../aiy-adapters" }
@@ -25,6 +29,8 @@ indicatif = "0.17"
 toml.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+chrono = { version = "0.4", features = ["serde"] }
+regex = "1"
 
 [dev-dependencies]
 tempfile.workspace = true

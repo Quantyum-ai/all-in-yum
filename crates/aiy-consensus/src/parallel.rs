@@ -105,7 +105,7 @@ pub fn calculate_success_rate(outcomes: &[AgentOutcome]) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aiy_adapters::{AdapterError, Verdict};
+    use aiy_adapters::{AdapterError, AdapterErrorKind, Verdict};
     use async_trait::async_trait;
 
     /// Mock adapter that returns a predetermined review.
@@ -178,7 +178,7 @@ mod tests {
         }
 
         async fn review_artifact(&self, _artifact: &str) -> Result<AgentReview, AdapterError> {
-            Err(AdapterError::new(&self.error_message))
+            Err(AdapterError::new(AdapterErrorKind::Unknown, &self.error_message))
         }
     }
 

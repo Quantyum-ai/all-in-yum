@@ -1,6 +1,7 @@
 //! All-in-Yum CLI - Command line interface for managing AI adapters
 
 mod commands;
+pub mod registry;
 
 use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
@@ -18,6 +19,21 @@ pub struct Cli {
 pub enum Commands {
     /// Display version information
     Version,
+
+    /// Ask a single AI agent a question
+    Ask {
+        /// Agent to use (e.g., grok)
+        #[arg(short, long)]
+        agent: String,
+
+        /// Prompt to send to the agent (or pipe via stdin)
+        #[arg(short, long)]
+        prompt: Option<String>,
+
+        /// Output format
+        #[arg(short, long, value_enum, default_value = "text")]
+        format: AskOutputFormatArg,
+    },
 
     /// Review a file using configured AI agents
     Review {
@@ -53,6 +69,16 @@ pub enum OutputFormatArg {
     /// Pretty-printed output with colors
     #[default]
     Pretty,
+    /// JSON output for scripting
+    Json,
+}
+
+/// Output format for ask results
+#[derive(Debug, Clone, Copy, Default, ValueEnum)]
+pub enum AskOutputFormatArg {
+    /// Plain text output
+    #[default]
+    Text,
     /// JSON output for scripting
     Json,
 }
@@ -129,6 +155,20 @@ async fn main() -> anyhow::Result<()> {
 
     match cli.command {
         Commands::Version => commands::version::run(),
+
+        Commands::Ask { agent, prompt, format } => {
+            let output_format = match format {
+                AskOutputFormatArg::Text => commands::ask::OutputFormat::Text,
+                AskOutputFormatArg::Json => commands::ask::OutputFormat::Json,
+            };
+
+            commands::ask::run(commands::ask::AskArgs {
+                agent,
+                prompt,
+                format: output_format,
+            })
+            .await
+        }
 
         Commands::Review { file, agents, format } => {
             let output_format = match format {
