@@ -1,6 +1,6 @@
 //! Integration tests for aiy-adapter-grok
 
-use aiy_adapter_grok::{GrokAdapter, GrokClient, GrokModel};
+use aiy_adapter_grok::{GrokAdapter, GrokClient, GrokModel, MockTransport};
 use aiy_adapters::AgentAdapter;
 use aiy_core::security::{CredentialBackend, CredentialManager};
 use std::sync::Arc;
@@ -32,7 +32,7 @@ async fn test_adapter_implements_trait() {
         mgr.store_key("xai", "test-key").unwrap();
     }
 
-    let mock_transport = Arc::new(aiy_adapter_grok::client::MockTransport::new());
+    let mock_transport = Arc::new(MockTransport::new());
     let client = GrokClient::new_with_mock(creds, mock_transport);
     let adapter = GrokAdapter::new(client);
 
@@ -63,7 +63,7 @@ async fn test_credential_retrieval_xai_provider() {
     }"#;
 
     let mock_transport =
-        Arc::new(aiy_adapter_grok::client::MockTransport::with_canned_response(mock_response.to_string()));
+        Arc::new(MockTransport::with_canned_response(mock_response.to_string()));
     let client = GrokClient::new_with_mock(creds, mock_transport);
 
     let response = client.generate_text("Test").await.unwrap();
@@ -93,7 +93,7 @@ async fn test_credential_fallback_to_grok() {
     }"#;
 
     let mock_transport =
-        Arc::new(aiy_adapter_grok::client::MockTransport::with_canned_response(mock_response.to_string()));
+        Arc::new(MockTransport::with_canned_response(mock_response.to_string()));
     let client = GrokClient::new_with_mock(creds, mock_transport);
 
     let response = client.generate_text("Test").await.unwrap();
@@ -109,7 +109,7 @@ async fn test_model_configuration() {
         mgr.store_key("xai", "key").unwrap();
     }
 
-    let mock_transport = Arc::new(aiy_adapter_grok::client::MockTransport::new());
+    let mock_transport = Arc::new(MockTransport::new());
     let client = GrokClient::new_with_mock(creds, mock_transport)
         .with_model(GrokModel::Grok3MiniBeta)
         .with_base_url("https://custom.api.test".to_string())
@@ -146,7 +146,7 @@ async fn test_sanitization_integration() {
     }"#;
 
     let mock_transport =
-        Arc::new(aiy_adapter_grok::client::MockTransport::with_canned_response(mock_response.to_string()));
+        Arc::new(MockTransport::with_canned_response(mock_response.to_string()));
     let client = GrokClient::new_with_mock(creds, mock_transport);
     let adapter = GrokAdapter::new(client);
 
@@ -184,7 +184,7 @@ async fn test_injection_defense_rejects_suspicious_output() {
         }]
     }"#;
 
-    let mock_transport = Arc::new(aiy_adapter_grok::client::MockTransport::with_canned_response(
+    let mock_transport = Arc::new(MockTransport::with_canned_response(
         malicious_response.to_string(),
     ));
     let client = GrokClient::new_with_mock(creds, mock_transport);
@@ -225,7 +225,7 @@ async fn test_schema_validation_rejects_invalid_json() {
     }"#;
 
     let mock_transport =
-        Arc::new(aiy_adapter_grok::client::MockTransport::with_canned_response(invalid_schema.to_string()));
+        Arc::new(MockTransport::with_canned_response(invalid_schema.to_string()));
     let client = GrokClient::new_with_mock(creds, mock_transport);
     let adapter = GrokAdapter::new(client);
 

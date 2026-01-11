@@ -3,7 +3,11 @@ members = [
     "crates/aiy-core",
     "crates/aiy-adapters",
     "crates/aiy-adapter-grok",
+    "crates/aiy-adapter-claude",
+    "crates/aiy-adapter-gemini",
+    "crates/aiy-adapter-codex",
     "crates/aiy-cli",
+    "crates/aiy-consensus",
 ]
 resolver = "2"
 
@@ -57,3 +61,7 @@ dirs = "5"
 # CLI
 clap = { version = "4", features = ["derive"] }
 rpassword = "7"
+
+# Internal crates
+aiy-adapters = { path = "crates/aiy-adapters" }
+aiy-consensus = { path = "crates/aiy-consensus" }

@@ -1,9 +1,9 @@
-//! Grok API client with pluggable transport and credential integration
+//! Codex API client with pluggable transport and credential integration
 
-use crate::error::GrokError;
-use crate::models::GrokModel;
+use crate::error::CodexError;
+use crate::models::CodexModel;
 use crate::transport::HttpTransport;
-use crate::types::{ChatMessage, ChatRequest, ChatResponse, MessageRole};
+use crate::types::{ChatCompletionRequest, ChatCompletionResponse, ChatMessage, MessageRole};
 use aiy_adapters::AgentReview;
 use aiy_core::security::CredentialManager;
 use aiy_core::security::sanitization::{
@@ -17,18 +17,18 @@ use tokio::sync::Mutex;
 // Re-export MockTransport for backwards compatibility
 pub use crate::transport::MockTransport;
 
-/// Default xAI API base URL
-pub const DEFAULT_BASE_URL: &str = "https://api.x.ai/v1";
+/// Default OpenAI API base URL
+pub const DEFAULT_BASE_URL: &str = "https://api.openai.com/v1";
 
 /// Default timeout in milliseconds
 pub const DEFAULT_TIMEOUT_MS: u64 = 120_000;
 
-/// Grok API client
-pub struct GrokClient {
+/// Codex API client
+pub struct CodexClient {
     /// Base URL for API
     base_url: String,
     /// Model to use
-    model: GrokModel,
+    model: CodexModel,
     /// Timeout in milliseconds
     timeout_ms: u64,
     /// HTTP transport (mock or real)
@@ -37,22 +37,22 @@ pub struct GrokClient {
     credential_manager: Arc<Mutex<CredentialManager>>,
 }
 
-impl GrokClient {
-    /// Create a new Grok client with mock transport (Stage A)
+impl CodexClient {
+    /// Create a new Codex client with mock transport (Stage A)
     pub fn new_with_mock(
         credential_manager: Arc<Mutex<CredentialManager>>,
         transport: Arc<dyn HttpTransport>,
     ) -> Self {
         Self {
             base_url: DEFAULT_BASE_URL.to_string(),
-            model: GrokModel::default(),
+            model: CodexModel::default(),
             timeout_ms: DEFAULT_TIMEOUT_MS,
             transport,
             credential_manager,
         }
     }
 
-    /// Create a new Grok client with real HTTP transport (Stage B)
+    /// Create a new Codex client with real HTTP transport (Stage B)
     ///
     /// This method is only available when the `http` feature is enabled.
     ///
@@ -61,7 +61,7 @@ impl GrokClient {
     #[cfg(feature = "http")]
     pub fn new_with_http(
         credential_manager: Arc<Mutex<CredentialManager>>,
-    ) -> Result<Self, GrokError> {
+    ) -> Result<Self, CodexError> {
         use crate::transport::ReqwestTransport;
         use std::time::Duration;
 
@@ -70,14 +70,14 @@ impl GrokClient {
 
         Ok(Self {
             base_url: DEFAULT_BASE_URL.to_string(),
-            model: GrokModel::default(),
+            model: CodexModel::default(),
             timeout_ms: DEFAULT_TIMEOUT_MS,
             transport: Arc::new(transport),
             credential_manager,
         })
     }
 
-    /// Create a new Grok client with real HTTP transport and custom timeout (Stage B)
+    /// Create a new Codex client with real HTTP transport and custom timeout (Stage B)
     ///
     /// This method is only available when the `http` feature is enabled.
     ///
@@ -87,7 +87,7 @@ impl GrokClient {
     pub fn new_with_http_timeout(
         credential_manager: Arc<Mutex<CredentialManager>>,
         timeout: std::time::Duration,
-    ) -> Result<Self, GrokError> {
+    ) -> Result<Self, CodexError> {
         use crate::transport::ReqwestTransport;
 
         let transport = ReqwestTransport::with_timeout(timeout)?;
@@ -95,7 +95,7 @@ impl GrokClient {
 
         Ok(Self {
             base_url: DEFAULT_BASE_URL.to_string(),
-            model: GrokModel::default(),
+            model: CodexModel::default(),
             timeout_ms,
             transport: Arc::new(transport),
             credential_manager,
@@ -109,7 +109,7 @@ impl GrokClient {
     }
 
     /// Set the model
-    pub fn with_model(mut self, model: GrokModel) -> Self {
+    pub fn with_model(mut self, model: CodexModel) -> Self {
         self.model = model;
         self
     }
@@ -122,27 +122,30 @@ impl GrokClient {
 
     /// Get the API key from credential manager
     ///
-    /// Tries provider names in order: "xai", "grok"
-    async fn get_api_key(&self) -> Result<String, GrokError> {
+    /// Tries provider names in order: "openai", "codex"
+    async fn get_api_key(&self) -> Result<String, CodexError> {
         let manager = self.credential_manager.lock().await;
 
-        // Try "xai" first
-        if let Ok(key) = manager.get_key("xai") {
+        // Try "openai" first
+        if let Ok(key) = manager.get_key("openai") {
             return Ok(key);
         }
 
-        // Fallback to "grok"
-        if let Ok(key) = manager.get_key("grok") {
+        // Fallback to "codex"
+        if let Ok(key) = manager.get_key("codex") {
             return Ok(key);
         }
 
-        Err(GrokError::Credential(
-            "No API key found for providers 'xai' or 'grok'".to_string(),
+        Err(CodexError::Credential(
+            "No API key found for providers 'openai' or 'codex'".to_string(),
         ))
     }
 
     /// Send a chat completion request
-    async fn chat_completion(&self, request: &ChatRequest) -> Result<ChatResponse, GrokError> {
+    async fn chat_completion(
+        &self,
+        request: &ChatCompletionRequest,
+    ) -> Result<ChatCompletionResponse, CodexError> {
         let api_key = self.get_api_key().await?;
         let url = format!("{}/chat/completions", self.base_url);
 
@@ -155,13 +158,13 @@ impl GrokClient {
 
         let response_json = self.transport.post_json(&url, &headers, &body).await?;
 
-        serde_json::from_str::<ChatResponse>(&response_json)
-            .map_err(|e| GrokError::ResponseParsing(e.to_string()))
+        serde_json::from_str::<ChatCompletionResponse>(&response_json)
+            .map_err(|e| CodexError::ResponseParsing(e.to_string()))
     }
 
     /// Generate text from a simple prompt
-    pub async fn generate_text(&self, prompt: &str) -> Result<String, GrokError> {
-        let request = ChatRequest::new(
+    pub async fn generate_text(&self, prompt: &str) -> Result<String, CodexError> {
+        let request = ChatCompletionRequest::new(
             self.model.to_string(),
             vec![ChatMessage {
                 role: MessageRole::User,
@@ -175,11 +178,11 @@ impl GrokClient {
             .choices
             .first()
             .and_then(|c| c.message.content.clone())
-            .ok_or_else(|| GrokError::ResponseParsing("No content in response".to_string()))
+            .ok_or_else(|| CodexError::ResponseParsing("No content in response".to_string()))
     }
 
     /// Review an artifact with full security defenses
-    pub async fn review_artifact(&self, artifact: &str) -> Result<AgentReview, GrokError> {
+    pub async fn review_artifact(&self, artifact: &str) -> Result<AgentReview, CodexError> {
         // Step 1: Sanitize artifact content
         let sanitized = sanitize_artifact_content(artifact);
 
@@ -194,13 +197,13 @@ impl GrokClient {
 
         // Step 5: Parse JSON response
         let response_json: Value = serde_json::from_str(&response_text)
-            .map_err(|e| GrokError::ResponseParsing(e.to_string()))?;
+            .map_err(|e| CodexError::ResponseParsing(e.to_string()))?;
 
         // Step 6: Validate schema
         validate_review_schema(&response_json)?;
 
         // Step 7: Parse into AgentReview
-        serde_json::from_value(response_json).map_err(|e| GrokError::ResponseParsing(e.to_string()))
+        serde_json::from_value(response_json).map_err(|e| CodexError::ResponseParsing(e.to_string()))
     }
 }
 
@@ -226,38 +229,38 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_credential_retrieval_xai() {
+    async fn test_credential_retrieval_openai() {
         let (manager, _temp) = setup_test_credential_manager();
         setup_and_unlock(&manager).await;
 
-        // Store key under "xai"
+        // Store key under "openai"
         {
             let mut mgr = manager.lock().await;
-            mgr.store_key("xai", "test-api-key").unwrap();
+            mgr.store_key("openai", "test-api-key").unwrap();
         }
 
         let mock_transport = Arc::new(MockTransport::with_canned_response(
-            r#"{"id":"test","object":"chat.completion","created":1234567890,"model":"grok-4-1-fast","choices":[{"index":0,"message":{"role":"assistant","content":"Hello"},"finish_reason":"stop"}]}"#.to_string()
+            r#"{"id":"test","object":"chat.completion","created":1234567890,"model":"gpt-4o","choices":[{"index":0,"message":{"role":"assistant","content":"Hello"},"finish_reason":"stop"}]}"#.to_string()
         ));
 
-        let client = GrokClient::new_with_mock(manager.clone(), mock_transport);
+        let client = CodexClient::new_with_mock(manager.clone(), mock_transport);
         let key = client.get_api_key().await.unwrap();
         assert_eq!(key, "test-api-key");
     }
 
     #[tokio::test]
-    async fn test_credential_retrieval_grok_fallback() {
+    async fn test_credential_retrieval_codex_fallback() {
         let (manager, _temp) = setup_test_credential_manager();
         setup_and_unlock(&manager).await;
 
-        // Store key under "grok" (fallback)
+        // Store key under "codex" (fallback)
         {
             let mut mgr = manager.lock().await;
-            mgr.store_key("grok", "fallback-key").unwrap();
+            mgr.store_key("codex", "fallback-key").unwrap();
         }
 
         let mock_transport = Arc::new(MockTransport::new());
-        let client = GrokClient::new_with_mock(manager.clone(), mock_transport);
+        let client = CodexClient::new_with_mock(manager.clone(), mock_transport);
         let key = client.get_api_key().await.unwrap();
         assert_eq!(key, "fallback-key");
     }
@@ -268,14 +271,14 @@ mod tests {
         setup_and_unlock(&manager).await;
         {
             let mut mgr = manager.lock().await;
-            mgr.store_key("xai", "test-key").unwrap();
+            mgr.store_key("openai", "test-key").unwrap();
         }
 
         let mock_response = r#"{
             "id": "test-id",
             "object": "chat.completion",
             "created": 1234567890,
-            "model": "grok-4-1-fast",
+            "model": "gpt-4o",
             "choices": [{
                 "index": 0,
                 "message": {
@@ -287,28 +290,41 @@ mod tests {
         }"#;
 
         let mock_transport = Arc::new(MockTransport::with_canned_response(mock_response.to_string()));
-        let client = GrokClient::new_with_mock(manager, mock_transport);
+        let client = CodexClient::new_with_mock(manager, mock_transport);
 
         let response = client.generate_text("Hello").await.unwrap();
         assert_eq!(response, "Test response");
     }
 
     #[tokio::test]
-    async fn test_request_includes_bearer_token() {
+    async fn test_client_builder_pattern() {
         let (manager, _temp) = setup_test_credential_manager();
         setup_and_unlock(&manager).await;
-        {
-            let mut mgr = manager.lock().await;
-            mgr.store_key("xai", "secret-token").unwrap();
-        }
 
-        let mock_response = r#"{"id":"test","object":"chat.completion","created":1234567890,"model":"grok-4-1-fast","choices":[{"index":0,"message":{"role":"assistant","content":"OK"},"finish_reason":"stop"}]}"#;
-        let mock_transport = Arc::new(MockTransport::with_canned_response(mock_response.to_string()));
+        let mock_transport = Arc::new(MockTransport::new());
+        let client = CodexClient::new_with_mock(manager, mock_transport)
+            .with_model(CodexModel::Gpt4oMini)
+            .with_base_url("https://custom.api.test".to_string())
+            .with_timeout_ms(60_000);
 
-        let client = GrokClient::new_with_mock(manager, mock_transport);
-        let _ = client.generate_text("Test").await;
+        // The client is created successfully with custom settings
+        assert!(client.base_url == "https://custom.api.test");
+    }
 
-        // In a real implementation, verify Authorization header contains "Bearer secret-token"
-        // For Stage A, this is a placeholder test
+    #[tokio::test]
+    async fn test_no_credentials_error() {
+        let (manager, _temp) = setup_test_credential_manager();
+        setup_and_unlock(&manager).await;
+        // Don't store any keys
+
+        let mock_transport = Arc::new(MockTransport::new());
+        let client = CodexClient::new_with_mock(manager, mock_transport);
+
+        let result = client.get_api_key().await;
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("No API key found"));
     }
 }

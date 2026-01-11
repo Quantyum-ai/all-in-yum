@@ -2,7 +2,8 @@
 
 mod commands;
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
+use std::path::PathBuf;
 
 /// All-in-Yum CLI - Unified interface for AI adapter management
 #[derive(Parser)]
@@ -17,37 +18,146 @@ pub struct Cli {
 pub enum Commands {
     /// Display version information
     Version,
+
+    /// Review a file using configured AI agents
+    Review {
+        /// File to review
+        #[arg(value_name = "FILE")]
+        file: PathBuf,
+
+        /// Agents to use (comma-separated, default: all enabled)
+        #[arg(short, long)]
+        agents: Option<String>,
+
+        /// Output format
+        #[arg(short, long, value_enum, default_value = "pretty")]
+        format: OutputFormatArg,
+    },
+
+    /// Manage AI agents
+    #[command(subcommand)]
+    Agents(AgentsCommands),
+
+    /// Manage configuration
+    #[command(subcommand)]
+    Config(ConfigCommands),
+
     /// Manage API credentials for AI providers
     #[command(subcommand)]
     Credentials(CredentialsCommands),
+}
+
+/// Output format for review results
+#[derive(Debug, Clone, Copy, Default, ValueEnum)]
+pub enum OutputFormatArg {
+    /// Pretty-printed output with colors
+    #[default]
+    Pretty,
+    /// JSON output for scripting
+    Json,
+}
+
+#[derive(Subcommand)]
+pub enum AgentsCommands {
+    /// List available agents with status
+    List,
+
+    /// Enable an agent
+    Enable {
+        /// Agent name (e.g., grok, claude, gemini, codex)
+        name: String,
+    },
+
+    /// Disable an agent
+    Disable {
+        /// Agent name (e.g., grok, claude, gemini, codex)
+        name: String,
+    },
+
+    /// Show which agents have valid credentials
+    Status,
+}
+
+#[derive(Subcommand)]
+pub enum ConfigCommands {
+    /// Display current configuration
+    Show,
+
+    /// Set a configuration value
+    Set {
+        /// Configuration key (e.g., default_models.grok, timeouts.claude)
+        key: String,
+
+        /// Value to set
+        value: String,
+    },
+
+    /// Show configuration file path
+    Path,
+
+    /// Reset configuration to defaults
+    Reset,
 }
 
 #[derive(Subcommand)]
 pub enum CredentialsCommands {
     /// Show credential status for all providers
     Status,
+
     /// Set credentials for a provider
     Set {
-        /// Provider name (e.g., openai, anthropic, grok)
+        /// Provider name (e.g., xai, anthropic, google, openai)
         provider: String,
     },
+
     /// Get credentials for a provider (masked)
     Get {
-        /// Provider name (e.g., openai, anthropic, grok)
+        /// Provider name (e.g., xai, anthropic, google, openai)
         provider: String,
     },
+
     /// Delete credentials for a provider
     Delete {
-        /// Provider name (e.g., openai, anthropic, grok)
+        /// Provider name (e.g., xai, anthropic, google, openai)
         provider: String,
     },
 }
 
-fn main() -> anyhow::Result<()> {
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
         Commands::Version => commands::version::run(),
+
+        Commands::Review { file, agents, format } => {
+            let output_format = match format {
+                OutputFormatArg::Pretty => commands::review::OutputFormat::Pretty,
+                OutputFormatArg::Json => commands::review::OutputFormat::Json,
+            };
+
+            commands::review::run(commands::review::ReviewArgs {
+                file,
+                agents,
+                format: output_format,
+            })
+            .await
+        }
+
+        Commands::Agents(cmd) => match cmd {
+            AgentsCommands::List => commands::agents::list(),
+            AgentsCommands::Enable { name } => commands::agents::enable(name),
+            AgentsCommands::Disable { name } => commands::agents::disable(name),
+            AgentsCommands::Status => commands::agents::status(),
+        },
+
+        Commands::Config(cmd) => match cmd {
+            ConfigCommands::Show => commands::config::show(),
+            ConfigCommands::Set { key, value } => commands::config::set(key, value),
+            ConfigCommands::Path => commands::config::path(),
+            ConfigCommands::Reset => commands::config::reset(),
+        },
+
         Commands::Credentials(cmd) => commands::credentials::run(cmd),
     }
 }

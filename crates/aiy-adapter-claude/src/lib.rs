@@ -1,8 +1,8 @@
-//! # aiy-adapter-grok
+//! # aiy-adapter-claude
 //!
-//! Grok (xAI) adapter for the All-in-Yum multi-agent consensus pipeline.
+//! Claude (Anthropic) adapter for the All-in-Yum multi-agent consensus pipeline.
 //!
-//! This crate provides a secure integration with xAI's Grok API, implementing
+//! This crate provides a secure integration with Anthropic's Claude API, implementing
 //! the `AgentAdapter` trait and enforcing prompt injection defenses.
 //!
 //! ## Features
@@ -13,17 +13,17 @@
 //!
 //! ### With Mock Transport (default, for testing)
 //! ```rust,ignore
-//! use aiy_adapter_grok::{GrokClient, client::MockTransport};
+//! use aiy_adapter_claude::{ClaudeClient, client::MockTransport};
 //!
 //! let transport = Arc::new(MockTransport::with_canned_response(response));
-//! let client = GrokClient::new_with_mock(credential_manager, transport);
+//! let client = ClaudeClient::new_with_mock(credential_manager, transport);
 //! ```
 //!
 //! ### With Real HTTP Transport (requires `http` feature)
 //! ```rust,ignore
-//! use aiy_adapter_grok::GrokClient;
+//! use aiy_adapter_claude::ClaudeClient;
 //!
-//! let client = GrokClient::new_with_http(credential_manager)?;
+//! let client = ClaudeClient::new_with_http(credential_manager)?;
 //! ```
 
 pub mod client;
@@ -32,11 +32,11 @@ pub mod models;
 pub mod transport;
 pub mod types;
 
-pub use client::GrokClient;
-pub use error::GrokError;
-pub use models::GrokModel;
+pub use client::ClaudeClient;
+pub use error::ClaudeError;
+pub use models::ClaudeModel;
 pub use transport::{HttpTransport, MockTransport};
-pub use types::{ChatMessage, ChatRequest, ChatResponse};
+pub use types::{Message, MessageContent, MessageRole, MessagesRequest, MessagesResponse};
 
 #[cfg(feature = "http")]
 pub use transport::ReqwestTransport;
@@ -44,19 +44,19 @@ pub use transport::ReqwestTransport;
 use aiy_adapters::{AdapterError, AgentAdapter, AgentReview};
 use async_trait::async_trait;
 
-/// Grok adapter implementing the AgentAdapter trait
-pub struct GrokAdapter {
-    client: GrokClient,
+/// Claude adapter implementing the AgentAdapter trait
+pub struct ClaudeAdapter {
+    client: ClaudeClient,
 }
 
-impl GrokAdapter {
-    /// Create a new GrokAdapter with a pre-configured client
-    pub fn new(client: GrokClient) -> Self {
+impl ClaudeAdapter {
+    /// Create a new ClaudeAdapter with a pre-configured client
+    pub fn new(client: ClaudeClient) -> Self {
         Self { client }
     }
 
     /// Generate text from a prompt (inherent async method)
-    pub async fn generate_text(&self, prompt: &str) -> Result<String, GrokError> {
+    pub async fn generate_text(&self, prompt: &str) -> Result<String, ClaudeError> {
         self.client.generate_text(prompt).await
     }
 
@@ -67,19 +67,19 @@ impl GrokAdapter {
     /// 2. Builds a secure review prompt
     /// 3. Validates the response
     /// 4. Enforces schema compliance
-    pub async fn review_artifact(&self, artifact: &str) -> Result<AgentReview, GrokError> {
+    pub async fn review_artifact(&self, artifact: &str) -> Result<AgentReview, ClaudeError> {
         self.client.review_artifact(artifact).await
     }
 }
 
 #[async_trait]
-impl AgentAdapter for GrokAdapter {
+impl AgentAdapter for ClaudeAdapter {
     fn id(&self) -> &str {
-        "grok"
+        "claude"
     }
 
     fn display_name(&self) -> &str {
-        "Grok (xAI)"
+        "Claude (Anthropic)"
     }
 
     async fn review_artifact(&self, artifact: &str) -> Result<AgentReview, AdapterError> {
