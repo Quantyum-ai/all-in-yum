@@ -1,7 +1,7 @@
 //! Integration tests for aiy-adapter-gemini
 
-use aiy_adapter_gemini::MockTransport;
 use aiy_adapter_gemini::types::{Content, GeminiRequest, GenerationConfig, Part};
+use aiy_adapter_gemini::MockTransport;
 use aiy_adapter_gemini::{GeminiAdapter, GeminiClient, GeminiError, GeminiModel};
 use aiy_adapters::AgentAdapter;
 use aiy_core::security::{CredentialBackend, CredentialManager};

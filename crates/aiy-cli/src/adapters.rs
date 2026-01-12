@@ -50,9 +50,9 @@ use aiy_adapter_grok::{GrokAdapter, GrokClient, GrokError};
 #[cfg(not(feature = "http"))]
 use aiy_adapter_claude::MockTransport as ClaudeMockTransport;
 #[cfg(not(feature = "http"))]
-use aiy_adapter_gemini::MockTransport as GeminiMockTransport;
-#[cfg(not(feature = "http"))]
 use aiy_adapter_codex::MockTransport as CodexMockTransport;
+#[cfg(not(feature = "http"))]
+use aiy_adapter_gemini::MockTransport as GeminiMockTransport;
 #[cfg(not(feature = "http"))]
 use aiy_adapter_grok::MockTransport as GrokMockTransport;
 
