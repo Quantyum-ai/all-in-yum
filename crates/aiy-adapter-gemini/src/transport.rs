@@ -144,7 +144,7 @@ impl ReqwestTransport {
 #[async_trait]
 impl HttpTransport for ReqwestTransport {
     async fn post_json(&self, url: &str, body: &str) -> Result<String, GeminiError> {
-        use aiy_adapters::retry::RetryConfig;
+        use aiy_adapters::RetryConfig;
 
         let config = RetryConfig::default();
 

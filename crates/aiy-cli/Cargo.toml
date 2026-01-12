@@ -13,7 +13,7 @@ path = "src/main.rs"
 
 [features]
 default = []
-http = ["aiy-adapter-grok/http", "aiy-adapter-claude/http", "aiy-adapter-codex/http"]
+http = ["aiy-adapter-grok/http", "aiy-adapter-claude/http", "aiy-adapter-codex/http", "aiy-adapter-gemini/http"]
 
 [dependencies]
 aiy-core = { path = "../aiy-core" }

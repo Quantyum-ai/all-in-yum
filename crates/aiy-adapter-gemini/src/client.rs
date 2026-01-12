@@ -49,6 +49,36 @@ impl GeminiClient {
         }
     }
 
+    /// Create a new Gemini client with real HTTP transport
+    ///
+    /// This constructor is only available when the `http` feature is enabled.
+    /// It creates a client that makes real API calls to Google's Generative AI API.
+    ///
+    /// # Arguments
+    ///
+    /// * `credential_manager` - Shared credential manager for API key retrieval
+    ///
+    /// # Returns
+    ///
+    /// A new `GeminiClient` configured with real HTTP transport, or an error
+    /// if the transport could not be created.
+    #[cfg(feature = "http")]
+    pub fn new_with_http(
+        credential_manager: Arc<Mutex<CredentialManager>>,
+    ) -> Result<Self, GeminiError> {
+        use crate::transport::ReqwestTransport;
+
+        let transport = ReqwestTransport::new()?;
+
+        Ok(Self {
+            base_url: DEFAULT_BASE_URL.to_string(),
+            model: GeminiModel::default(),
+            timeout_ms: DEFAULT_TIMEOUT_MS,
+            transport: Arc::new(transport),
+            credential_manager,
+        })
+    }
+
     /// Set a custom base URL
     pub fn with_base_url(mut self, base_url: String) -> Self {
         self.base_url = base_url;

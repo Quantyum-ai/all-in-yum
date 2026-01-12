@@ -46,12 +46,11 @@ use aiy_adapter_codex::{CodexAdapter, CodexClient, CodexError};
 use aiy_adapter_gemini::{GeminiAdapter, GeminiClient, GeminiError};
 use aiy_adapter_grok::{GrokAdapter, GrokClient, GrokError};
 
-// Import mock transports
-// Note: Gemini doesn't have HTTP feature yet, so we always use mock for it
-use aiy_adapter_gemini::MockTransport as GeminiMockTransport;
-
+// Import mock transports (only needed when http feature is disabled)
 #[cfg(not(feature = "http"))]
 use aiy_adapter_claude::MockTransport as ClaudeMockTransport;
+#[cfg(not(feature = "http"))]
+use aiy_adapter_gemini::MockTransport as GeminiMockTransport;
 #[cfg(not(feature = "http"))]
 use aiy_adapter_codex::MockTransport as CodexMockTransport;
 #[cfg(not(feature = "http"))]
@@ -293,10 +292,7 @@ pub async fn create_review_adapter(
             Ok(Box::new(ClaudeAdapter::new(client)))
         }
         "gemini" => {
-            // Gemini doesn't have new_with_http yet, use mock for now
-            // TODO: Implement HTTP transport for Gemini
-            let mock_transport = Arc::new(GeminiMockTransport::new());
-            let client = GeminiClient::new_with_mock(credential_manager, mock_transport);
+            let client = GeminiClient::new_with_http(credential_manager)?;
             Ok(Box::new(GeminiAdapter::new(client)))
         }
         "codex" => {
@@ -362,10 +358,7 @@ pub async fn create_ask_adapter(
             Ok(AskAdapter::Claude(ClaudeAdapter::new(client)))
         }
         "gemini" => {
-            // Gemini doesn't have new_with_http yet, use mock for now
-            // TODO: Implement HTTP transport for Gemini
-            let mock_transport = Arc::new(GeminiMockTransport::new());
-            let client = GeminiClient::new_with_mock(credential_manager, mock_transport);
+            let client = GeminiClient::new_with_http(credential_manager)?;
             Ok(AskAdapter::Gemini(GeminiAdapter::new(client)))
         }
         "codex" => {

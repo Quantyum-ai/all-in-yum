@@ -30,12 +30,16 @@ pub enum Commands {
         #[arg(short, long)]
         agent: String,
 
-        /// Prompt to send to the agent (or pipe via stdin)
+        /// Prompt to send to the agent (positional argument)
+        #[arg(value_name = "PROMPT")]
+        prompt_positional: Option<String>,
+
+        /// Prompt to send to the agent (flag form, takes precedence over positional)
         #[arg(short, long)]
         prompt: Option<String>,
 
         /// Output format
-        #[arg(short, long, value_enum, default_value = "text")]
+        #[arg(short = 'f', long, value_enum, default_value = "text")]
         format: AskOutputFormatArg,
     },
 
@@ -165,9 +169,13 @@ async fn main() -> anyhow::Result<()> {
 
         Commands::Ask {
             agent,
+            prompt_positional,
             prompt,
             format,
         } => {
+            // Flag takes precedence over positional argument
+            let prompt = prompt.or(prompt_positional);
+
             let output_format = match format {
                 AskOutputFormatArg::Text => commands::ask::OutputFormat::Text,
                 AskOutputFormatArg::Json => commands::ask::OutputFormat::Json,
