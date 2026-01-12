@@ -116,11 +116,7 @@ impl HttpTransport for ReqwestTransport {
         headers: &[(&str, &str)],
         body: &str,
     ) -> Result<String, GrokError> {
-        let mut request = self
-            .client
-            .post(url)
-            .body(body.to_string())
-            .header("Content-Type", "application/json");
+        let mut request = self.client.post(url).body(body.to_string());
 
         for (key, value) in headers {
             request = request.header(*key, *value);
