@@ -48,8 +48,7 @@ use aiy_adapter_grok::{GrokAdapter, GrokClient, GrokError};
 
 // Import mock transports
 // Note: Gemini doesn't have HTTP feature yet, so we always use mock for it
-// We need HttpTransport trait in scope for Arc<dyn HttpTransport> coercion
-use aiy_adapter_gemini::{HttpTransport as _, MockTransport as GeminiMockTransport};
+use aiy_adapter_gemini::MockTransport as GeminiMockTransport;
 
 #[cfg(not(feature = "http"))]
 use aiy_adapter_claude::MockTransport as ClaudeMockTransport;
