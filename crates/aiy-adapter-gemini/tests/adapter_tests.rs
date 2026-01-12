@@ -1,8 +1,8 @@
 //! Integration tests for aiy-adapter-gemini
 
-use aiy_adapter_gemini::{GeminiAdapter, GeminiClient, GeminiError, GeminiModel};
-use aiy_adapter_gemini::client::MockTransport;
+use aiy_adapter_gemini::MockTransport;
 use aiy_adapter_gemini::types::{Content, GeminiRequest, GenerationConfig, Part};
+use aiy_adapter_gemini::{GeminiAdapter, GeminiClient, GeminiError, GeminiModel};
 use aiy_adapters::AgentAdapter;
 use aiy_core::security::{CredentialBackend, CredentialManager};
 use std::sync::Arc;
@@ -68,8 +68,9 @@ async fn test_credential_retrieval_google_provider() {
         }]
     }"#;
 
-    let mock_transport =
-        Arc::new(MockTransport::with_canned_response(mock_response.to_string()));
+    let mock_transport = Arc::new(MockTransport::with_canned_response(
+        mock_response.to_string(),
+    ));
     let client = GeminiClient::new_with_mock(creds, mock_transport);
 
     let response = client.generate_text("Test").await.unwrap();
@@ -99,8 +100,9 @@ async fn test_credential_fallback_to_gemini() {
         }]
     }"#;
 
-    let mock_transport =
-        Arc::new(MockTransport::with_canned_response(mock_response.to_string()));
+    let mock_transport = Arc::new(MockTransport::with_canned_response(
+        mock_response.to_string(),
+    ));
     let client = GeminiClient::new_with_mock(creds, mock_transport);
 
     let response = client.generate_text("Test").await.unwrap();
@@ -113,9 +115,18 @@ async fn test_credential_fallback_to_gemini() {
 #[test]
 fn test_model_string_mapping() {
     assert_eq!(GeminiModel::Gemini15Pro.as_str(), "gemini-1.5-pro-latest");
-    assert_eq!(GeminiModel::Gemini15Flash.as_str(), "gemini-1.5-flash-latest");
-    assert_eq!(GeminiModel::Gemini20FlashExp.as_str(), "gemini-2.0-flash-exp");
-    assert_eq!(GeminiModel::Gemini15Flash8B.as_str(), "gemini-1.5-flash-8b-latest");
+    assert_eq!(
+        GeminiModel::Gemini15Flash.as_str(),
+        "gemini-1.5-flash-latest"
+    );
+    assert_eq!(
+        GeminiModel::Gemini20FlashExp.as_str(),
+        "gemini-2.0-flash-exp"
+    );
+    assert_eq!(
+        GeminiModel::Gemini15Flash8B.as_str(),
+        "gemini-1.5-flash-8b-latest"
+    );
 }
 
 // ============================================================================
@@ -142,12 +153,11 @@ fn test_model_context_windows() {
 // ============================================================================
 #[test]
 fn test_request_serialization_format() {
-    let req = GeminiRequest::new("Test prompt")
-        .with_generation_config(
-            GenerationConfig::new()
-                .with_temperature(0.7)
-                .with_max_output_tokens(1000)
-        );
+    let req = GeminiRequest::new("Test prompt").with_generation_config(
+        GenerationConfig::new()
+            .with_temperature(0.7)
+            .with_max_output_tokens(1000),
+    );
 
     let json = serde_json::to_string(&req).unwrap();
 
@@ -254,8 +264,9 @@ async fn test_sanitization_integration() {
         }]
     }"#;
 
-    let mock_transport =
-        Arc::new(MockTransport::with_canned_response(mock_response.to_string()));
+    let mock_transport = Arc::new(MockTransport::with_canned_response(
+        mock_response.to_string(),
+    ));
     let client = GeminiClient::new_with_mock(creds, mock_transport);
     let adapter = GeminiAdapter::new(client);
 
@@ -329,8 +340,9 @@ async fn test_schema_validation_rejects_invalid_json() {
         }]
     }"#;
 
-    let mock_transport =
-        Arc::new(MockTransport::with_canned_response(invalid_schema.to_string()));
+    let mock_transport = Arc::new(MockTransport::with_canned_response(
+        invalid_schema.to_string(),
+    ));
     let client = GeminiClient::new_with_mock(creds, mock_transport);
     let adapter = GeminiAdapter::new(client);
 
@@ -354,17 +366,14 @@ fn test_error_sanitization_api_key_never_exposed() {
     assert!(!sanitized.contains("key="));
 
     // Test transport errors
-    let transport_error = GeminiError::Transport(
-        "Connection failed: ?key=SUPER_SECRET_KEY".to_string()
-    );
+    let transport_error =
+        GeminiError::Transport("Connection failed: ?key=SUPER_SECRET_KEY".to_string());
     let sanitized = transport_error.to_sanitized_string();
     assert!(!sanitized.contains("SUPER_SECRET"));
     assert!(!sanitized.contains("key="));
 
     // Test credential errors
-    let cred_error = GeminiError::Credential(
-        "Key value: AIzaSyC123456789".to_string()
-    );
+    let cred_error = GeminiError::Credential("Key value: AIzaSyC123456789".to_string());
     let sanitized = cred_error.to_sanitized_string();
     assert!(!sanitized.contains("AIzaSy"));
 }
@@ -399,8 +408,9 @@ async fn test_empty_response_handling() {
     // Mock response with empty candidates
     let empty_response = r#"{"candidates": []}"#;
 
-    let mock_transport =
-        Arc::new(MockTransport::with_canned_response(empty_response.to_string()));
+    let mock_transport = Arc::new(MockTransport::with_canned_response(
+        empty_response.to_string(),
+    ));
     let client = GeminiClient::new_with_mock(creds, mock_transport);
 
     let result = client.generate_text("Test").await;
@@ -452,6 +462,12 @@ fn test_model_pricing() {
 // ============================================================================
 #[test]
 fn test_model_display() {
-    assert_eq!(format!("{}", GeminiModel::Gemini15Pro), "gemini-1.5-pro-latest");
-    assert_eq!(format!("{}", GeminiModel::Gemini20FlashExp), "gemini-2.0-flash-exp");
+    assert_eq!(
+        format!("{}", GeminiModel::Gemini15Pro),
+        "gemini-1.5-pro-latest"
+    );
+    assert_eq!(
+        format!("{}", GeminiModel::Gemini20FlashExp),
+        "gemini-2.0-flash-exp"
+    );
 }

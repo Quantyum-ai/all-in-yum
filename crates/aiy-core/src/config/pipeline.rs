@@ -206,16 +206,13 @@ mod tests {
             credential_backend: "file".to_string(),
             ..Default::default()
         };
-        config
-            .timeouts
-            .insert("custom_agent".to_string(), 60_000);
+        config.timeouts.insert("custom_agent".to_string(), 60_000);
 
         // Save it
         config.save(&config_path).expect("Failed to save config");
 
         // Load it back
-        let loaded_config =
-            PipelineConfig::load(&config_path).expect("Failed to load config");
+        let loaded_config = PipelineConfig::load(&config_path).expect("Failed to load config");
 
         // Verify equality
         assert_eq!(config, loaded_config);
@@ -230,8 +227,7 @@ mod tests {
         config.save(&config_path).expect("Failed to save config");
 
         // Read the raw file contents
-        let contents =
-            std::fs::read_to_string(&config_path).expect("Failed to read config file");
+        let contents = std::fs::read_to_string(&config_path).expect("Failed to read config file");
 
         // Convert to lowercase for case-insensitive search
         let contents_lower = contents.to_lowercase();
@@ -315,12 +311,14 @@ mod tests {
         let config_path = temp_dir.path().join("invalid.toml");
 
         // Write invalid TOML
-        std::fs::write(&config_path, "this is not { valid toml")
-            .expect("Failed to write file");
+        std::fs::write(&config_path, "this is not { valid toml").expect("Failed to write file");
 
         let result = PipelineConfig::load(&config_path);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ConfigError::TomlDeserialize(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            ConfigError::TomlDeserialize(_)
+        ));
     }
 
     #[test]

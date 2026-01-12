@@ -125,7 +125,7 @@ impl WeightedConfig {
     /// assert!(config.validate().is_err());
     /// ```
     pub fn validate(&self) -> Result<(), &'static str> {
-        for (_agent_id, weight) in &self.weights {
+        for weight in self.weights.values() {
             if *weight <= 0.0 {
                 return Err("Weights must be positive");
             }
@@ -179,7 +179,10 @@ impl VotingStrategy {
             return "No reviews provided - cannot reach consensus.".to_string();
         }
 
-        let pass_count = reviews.iter().filter(|r| r.verdict == Verdict::Pass).count();
+        let pass_count = reviews
+            .iter()
+            .filter(|r| r.verdict == Verdict::Pass)
+            .count();
         let total = reviews.len();
 
         match self {
@@ -275,14 +278,20 @@ impl VotingStrategy {
 
     /// Majority: more than 50% must pass.
     fn decide_majority(reviews: &[AgentReview]) -> Verdict {
-        let pass_count = reviews.iter().filter(|r| r.verdict == Verdict::Pass).count();
+        let pass_count = reviews
+            .iter()
+            .filter(|r| r.verdict == Verdict::Pass)
+            .count();
         let total = reviews.len();
 
         if pass_count > total / 2 {
             Verdict::Pass
         } else {
             // Check if there are any blocking verdicts
-            let block_count = reviews.iter().filter(|r| r.verdict == Verdict::Block).count();
+            let block_count = reviews
+                .iter()
+                .filter(|r| r.verdict == Verdict::Block)
+                .count();
             if block_count > total / 2 {
                 Verdict::Block
             } else {
@@ -327,17 +336,16 @@ impl VotingStrategy {
         let mut pass_weight = 0.0;
 
         for review in reviews {
+            let default_weight = if config.use_confidence_as_weight {
+                review.confidence
+            } else {
+                1.0
+            };
             let weight = config
                 .weights
                 .get(&review.agent_id)
                 .copied()
-                .unwrap_or_else(|| {
-                    if config.use_confidence_as_weight {
-                        review.confidence
-                    } else {
-                        1.0
-                    }
-                });
+                .unwrap_or(default_weight);
 
             total_weight += weight;
             if review.verdict == Verdict::Pass {
@@ -358,17 +366,16 @@ impl VotingStrategy {
         let mut block_weight = 0.0;
 
         for review in reviews {
+            let default_weight = if config.use_confidence_as_weight {
+                review.confidence
+            } else {
+                1.0
+            };
             let weight = config
                 .weights
                 .get(&review.agent_id)
                 .copied()
-                .unwrap_or_else(|| {
-                    if config.use_confidence_as_weight {
-                        review.confidence
-                    } else {
-                        1.0
-                    }
-                });
+                .unwrap_or(default_weight);
 
             total_weight += weight;
             if review.verdict == Verdict::Block {
@@ -529,7 +536,7 @@ mod tests {
     #[test]
     fn test_weighted_with_confidence() {
         let reviews = vec![
-            create_review("grok", Verdict::Pass, 0.9),   // weight 0.9
+            create_review("grok", Verdict::Pass, 0.9),    // weight 0.9
             create_review("claude", Verdict::Block, 0.1), // weight 0.1
         ];
 

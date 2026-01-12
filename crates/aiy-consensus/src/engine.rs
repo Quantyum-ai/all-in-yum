@@ -2,7 +2,8 @@
 
 use crate::error::ConsensusError;
 use crate::parallel::{
-    execute_agents_parallel, execute_agents_sequential, extract_successful_reviews, DEFAULT_TIMEOUT_MS,
+    execute_agents_parallel, execute_agents_sequential, extract_successful_reviews,
+    DEFAULT_TIMEOUT_MS,
 };
 use crate::strategies::VotingStrategy;
 use crate::types::ConsensusResult;
@@ -255,7 +256,10 @@ impl ConsensusEngine {
     ///
     /// Even in best-effort mode, at least one agent must succeed.
     /// Zero successful reviews will always return an error, never `Pass`.
-    pub async fn review_best_effort(&self, artifact: &str) -> Result<ConsensusResult, ConsensusError> {
+    pub async fn review_best_effort(
+        &self,
+        artifact: &str,
+    ) -> Result<ConsensusResult, ConsensusError> {
         if self.adapters.is_empty() {
             return Err(ConsensusError::NoReviews);
         }
@@ -535,9 +539,7 @@ mod tests {
 
     impl FailingAdapter {
         fn new(id: &str) -> Self {
-            Self {
-                id: id.to_string(),
-            }
+            Self { id: id.to_string() }
         }
     }
 
@@ -552,7 +554,10 @@ mod tests {
         }
 
         async fn review_artifact(&self, _artifact: &str) -> Result<AgentReview, AdapterError> {
-            Err(AdapterError::new(AdapterErrorKind::Unknown, "Simulated failure"))
+            Err(AdapterError::new(
+                AdapterErrorKind::Unknown,
+                "Simulated failure",
+            ))
         }
     }
 
@@ -637,8 +642,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_engine_timeout() {
-        let adapters: Vec<Box<dyn AgentAdapter>> =
-            vec![Box::new(MockAdapter::with_delay("slow", Verdict::Pass, 500))];
+        let adapters: Vec<Box<dyn AgentAdapter>> = vec![Box::new(MockAdapter::with_delay(
+            "slow",
+            Verdict::Pass,
+            500,
+        ))];
 
         let engine = ConsensusEngine::new(adapters).with_timeout_ms(100);
         let result = engine.review("test code").await;

@@ -1,5 +1,8 @@
 //! All-in-Yum CLI - Command line interface for managing AI adapters
 
+#![warn(missing_docs)]
+
+pub mod adapters;
 mod commands;
 pub mod registry;
 
@@ -15,6 +18,7 @@ pub struct Cli {
     command: Commands,
 }
 
+/// Top-level CLI commands
 #[derive(Subcommand)]
 pub enum Commands {
     /// Display version information
@@ -83,6 +87,7 @@ pub enum AskOutputFormatArg {
     Json,
 }
 
+/// Agent management subcommands
 #[derive(Subcommand)]
 pub enum AgentsCommands {
     /// List available agents with status
@@ -104,6 +109,7 @@ pub enum AgentsCommands {
     Status,
 }
 
+/// Configuration management subcommands
 #[derive(Subcommand)]
 pub enum ConfigCommands {
     /// Display current configuration
@@ -125,6 +131,7 @@ pub enum ConfigCommands {
     Reset,
 }
 
+/// Credential management subcommands
 #[derive(Subcommand)]
 pub enum CredentialsCommands {
     /// Show credential status for all providers
@@ -156,7 +163,11 @@ async fn main() -> anyhow::Result<()> {
     match cli.command {
         Commands::Version => commands::version::run(),
 
-        Commands::Ask { agent, prompt, format } => {
+        Commands::Ask {
+            agent,
+            prompt,
+            format,
+        } => {
             let output_format = match format {
                 AskOutputFormatArg::Text => commands::ask::OutputFormat::Text,
                 AskOutputFormatArg::Json => commands::ask::OutputFormat::Json,
@@ -170,7 +181,11 @@ async fn main() -> anyhow::Result<()> {
             .await
         }
 
-        Commands::Review { file, agents, format } => {
+        Commands::Review {
+            file,
+            agents,
+            format,
+        } => {
             let output_format = match format {
                 OutputFormatArg::Pretty => commands::review::OutputFormat::Pretty,
                 OutputFormatArg::Json => commands::review::OutputFormat::Json,
@@ -189,10 +204,6 @@ async fn main() -> anyhow::Result<()> {
                 commands::review::ReviewResult::NoReviews => {
                     // SECURITY: Exit with non-zero when no reviews completed
                     std::process::exit(1);
-                }
-                commands::review::ReviewResult::Blocked => {
-                    // Consensus blocked the artifact
-                    std::process::exit(2);
                 }
             }
         }

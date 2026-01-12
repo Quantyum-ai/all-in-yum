@@ -60,6 +60,19 @@ impl From<aiy_core::security::sanitization::SanitizationError> for GeminiError {
 }
 
 impl GeminiError {
+    /// Check if this error is retryable
+    ///
+    /// Returns true for transient errors that may succeed on retry:
+    /// - Rate limit errors (429)
+    /// - Transport errors (network issues)
+    /// - Timeout errors
+    pub fn is_retryable(&self) -> bool {
+        matches!(
+            self,
+            GeminiError::RateLimit(_) | GeminiError::Transport(_) | GeminiError::Timeout(_)
+        )
+    }
+
     /// Get the error kind for this error.
     ///
     /// Maps internal error variants to the standardized `AdapterErrorKind`.
@@ -132,9 +145,7 @@ mod tests {
 
     #[test]
     fn test_transport_error_sanitization() {
-        let err = GeminiError::Transport(
-            "Connection failed to URL with key=SECRET123".to_string()
-        );
+        let err = GeminiError::Transport("Connection failed to URL with key=SECRET123".to_string());
         let sanitized = err.to_sanitized_string();
         assert_eq!(sanitized, "Transport error occurred");
         assert!(!sanitized.contains("SECRET"));
@@ -149,10 +160,16 @@ mod tests {
 
         let err = GeminiError::SecurityValidation("Suspicious pattern detected".to_string());
         let sanitized = err.to_sanitized_string();
-        assert_eq!(sanitized, "Security validation failed: Suspicious pattern detected");
+        assert_eq!(
+            sanitized,
+            "Security validation failed: Suspicious pattern detected"
+        );
 
         let err = GeminiError::SchemaValidation("Missing required field 'verdict'".to_string());
         let sanitized = err.to_sanitized_string();
-        assert_eq!(sanitized, "Schema validation failed: Missing required field 'verdict'");
+        assert_eq!(
+            sanitized,
+            "Schema validation failed: Missing required field 'verdict'"
+        );
     }
 }

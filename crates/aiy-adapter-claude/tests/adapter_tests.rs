@@ -69,8 +69,9 @@ async fn test_credential_retrieval_claude_provider() {
         }
     }"#;
 
-    let mock_transport =
-        Arc::new(MockTransport::with_canned_response(mock_response.to_string()));
+    let mock_transport = Arc::new(MockTransport::with_canned_response(
+        mock_response.to_string(),
+    ));
     let client = ClaudeClient::new_with_mock(creds, mock_transport);
 
     let response = client.generate_text("Test").await.unwrap();
@@ -84,7 +85,8 @@ async fn test_credential_fallback_to_anthropic() {
     {
         let mut mgr = creds.lock().await;
         // Don't store "claude", only "anthropic"
-        mgr.store_key("anthropic", "anthropic-fallback-key").unwrap();
+        mgr.store_key("anthropic", "anthropic-fallback-key")
+            .unwrap();
     }
 
     let mock_response = r#"{
@@ -106,8 +108,9 @@ async fn test_credential_fallback_to_anthropic() {
         }
     }"#;
 
-    let mock_transport =
-        Arc::new(MockTransport::with_canned_response(mock_response.to_string()));
+    let mock_transport = Arc::new(MockTransport::with_canned_response(
+        mock_response.to_string(),
+    ));
     let client = ClaudeClient::new_with_mock(creds, mock_transport);
 
     let response = client.generate_text("Test").await.unwrap();
@@ -164,8 +167,9 @@ async fn test_sanitization_integration() {
         }
     }"#;
 
-    let mock_transport =
-        Arc::new(MockTransport::with_canned_response(mock_response.to_string()));
+    let mock_transport = Arc::new(MockTransport::with_canned_response(
+        mock_response.to_string(),
+    ));
     let client = ClaudeClient::new_with_mock(creds, mock_transport);
     let adapter = ClaudeAdapter::new(client);
 
@@ -251,8 +255,9 @@ async fn test_schema_validation_rejects_invalid_json() {
         }
     }"#;
 
-    let mock_transport =
-        Arc::new(MockTransport::with_canned_response(invalid_schema.to_string()));
+    let mock_transport = Arc::new(MockTransport::with_canned_response(
+        invalid_schema.to_string(),
+    ));
     let client = ClaudeClient::new_with_mock(creds, mock_transport);
     let adapter = ClaudeAdapter::new(client);
 
@@ -379,8 +384,9 @@ async fn test_response_parsing_preserves_content() {
         }
     }"#;
 
-    let mock_transport =
-        Arc::new(MockTransport::with_canned_response(mock_response.to_string()));
+    let mock_transport = Arc::new(MockTransport::with_canned_response(
+        mock_response.to_string(),
+    ));
     let client = ClaudeClient::new_with_mock(creds, mock_transport);
 
     let response = client.generate_text("Hello").await.unwrap();

@@ -3,14 +3,15 @@
 //! Provides the `aiy ask --agent <agent> --prompt "..."` command for querying
 //! a single AI agent with a prompt and receiving a text response.
 
-#[cfg(feature = "http")]
-use aiy_adapter_grok::GrokClient;
-use aiy_adapter_grok::{GrokAdapter, GrokError};
+use crate::adapters::{create_ask_adapter, AdapterCreationError};
+use crate::registry::{get_agent, is_valid_agent, valid_agents_string};
 use aiy_core::security::{CredentialBackend, CredentialManager};
 use chrono::Utc;
+use indicatif::{ProgressBar, ProgressStyle};
 use serde::Serialize;
 use std::io::{self, BufRead, IsTerminal};
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::Mutex;
 
 /// Output format for ask results
@@ -23,10 +24,13 @@ pub enum OutputFormat {
     Json,
 }
 
-/// Arguments for the ask command
+/// Arguments for the ask command.
+///
+/// Contains all the parameters needed to execute an ask operation against
+/// a single AI agent.
 #[derive(Debug)]
 pub struct AskArgs {
-    /// Agent to use (e.g., grok)
+    /// Agent to use (e.g., grok, claude, gemini, codex)
     pub agent: String,
     /// Prompt to send to the agent
     pub prompt: Option<String>,
@@ -34,7 +38,10 @@ pub struct AskArgs {
     pub format: OutputFormat,
 }
 
-/// JSON output structure for ask results
+/// JSON output structure for ask results.
+///
+/// This struct is serialized when the user requests JSON output format,
+/// providing machine-readable response data for scripting and automation.
 #[derive(Debug, Serialize)]
 pub struct AskResponse {
     /// Agent identifier
@@ -47,15 +54,35 @@ pub struct AskResponse {
     pub timestamp: String,
 }
 
-/// Run the ask command
+/// Run the ask command.
+///
+/// Sends a prompt to the specified AI agent and outputs the response.
+/// Supports both interactive terminal prompts and piped stdin input.
+///
+/// # Arguments
+///
+/// * `args` - The ask command arguments including agent, prompt, and format
+///
+/// # Returns
+///
+/// Returns `Ok(())` on success, or an error if the operation fails.
+///
+/// # Errors
+///
+/// This function will return an error if:
+/// - The specified agent is not supported
+/// - The prompt is empty or missing
+/// - Credentials are not configured or invalid
+/// - The API request fails
 pub async fn run(args: AskArgs) -> anyhow::Result<()> {
-    // Validate agent
+    // Validate agent using registry
     let agent = args.agent.to_lowercase();
-    if agent != "grok" {
+    if !is_valid_agent(&agent) {
         anyhow::bail!(
-            "Agent '{}' is not supported yet. Currently supported agents: grok\n\
-             More agents coming soon!",
-            args.agent
+            "Unknown agent '{}'. Valid agents: {}\n\
+             Use 'aiy agents list' to see available agents.",
+            args.agent,
+            valid_agents_string()
         );
     }
 
@@ -83,14 +110,31 @@ pub async fn run(args: AskArgs) -> anyhow::Result<()> {
     // Unlock credential manager
     unlock_credentials(&credential_manager, &cred_path).await?;
 
-    // Create the Grok adapter
-    let adapter = create_grok_adapter(credential_manager).await?;
+    // Create adapter using factory
+    let adapter = create_ask_adapter(&agent, credential_manager)
+        .await
+        .map_err(format_adapter_error)?;
+
+    // Get agent display name from registry
+    let agent_display_name = get_agent(&agent).map(|a| a.display_name).unwrap_or(&agent);
+
+    // Create progress spinner for ask operation
+    let pb = ProgressBar::new_spinner();
+    pb.set_style(
+        ProgressStyle::default_spinner()
+            .template("{spinner:.green} {msg}")
+            .expect("Invalid spinner template"),
+    );
+    pb.set_message(format!("Asking {}...", agent_display_name));
+    pb.enable_steady_tick(Duration::from_millis(100));
 
     // Generate response
     let response_text = adapter
         .generate_text(&prompt)
         .await
-        .map_err(format_grok_error)?;
+        .map_err(format_adapter_error)?;
+
+    pb.finish_and_clear();
 
     // Output based on format
     match args.format {
@@ -99,8 +143,8 @@ pub async fn run(args: AskArgs) -> anyhow::Result<()> {
         }
         OutputFormat::Json => {
             let response = AskResponse {
-                agent_id: "grok".to_string(),
-                model: "grok-4-1-fast".to_string(),
+                agent_id: adapter.agent_id().to_string(),
+                model: adapter.model_name().to_string(),
                 text: response_text,
                 timestamp: Utc::now().to_rfc3339(),
             };
@@ -146,7 +190,8 @@ async fn unlock_credentials(
     if !cred_path.exists() {
         anyhow::bail!(
             "No credentials configured. Set up your API key with:\n  \
-             aiy credentials set xai"
+             aiy credentials set <provider>\n\n\
+             Providers: xai (Grok), anthropic (Claude), google (Gemini), openai (Codex)"
         );
     }
 
@@ -168,9 +213,9 @@ async fn unlock_credentials(
     if std::io::stdin().is_terminal() {
         // Interactive: prompt for password
         let password = rpassword::prompt_password("Enter credentials password: ")?;
-        manager.unlock(&password).map_err(|_| {
-            anyhow::anyhow!("Failed to unlock credentials. Incorrect password?")
-        })?;
+        manager
+            .unlock(&password)
+            .map_err(|_| anyhow::anyhow!("Failed to unlock credentials. Incorrect password?"))?;
     } else {
         // Non-interactive: require AIY_CREDENTIALS_PASSWORD
         anyhow::bail!(
@@ -182,86 +227,59 @@ async fn unlock_credentials(
     Ok(())
 }
 
-/// Create a Grok adapter with HTTP transport (when available) or error
-#[cfg(feature = "http")]
-async fn create_grok_adapter(
-    credential_manager: Arc<Mutex<CredentialManager>>,
-) -> anyhow::Result<GrokAdapter> {
-    let client = GrokClient::new_with_http(credential_manager)?;
-    Ok(GrokAdapter::new(client))
-}
-
-#[cfg(not(feature = "http"))]
-async fn create_grok_adapter(
-    _credential_manager: Arc<Mutex<CredentialManager>>,
-) -> anyhow::Result<GrokAdapter> {
-    anyhow::bail!(
-        "HTTP transport not enabled. Build with `--features http` for real API calls.\n\
-         For testing, use the mock transport via the test harness."
-    )
-}
-
-/// Format Grok error into a user-friendly message without leaking secrets
-fn format_grok_error(error: GrokError) -> anyhow::Error {
+/// Format adapter creation error into a user-friendly message without leaking secrets
+fn format_adapter_error(error: AdapterCreationError) -> anyhow::Error {
     match error {
-        GrokError::Credential(_) => {
-            // Never print the actual credential error message as it might contain hints
+        AdapterCreationError::UnknownAgent(id) => {
             anyhow::anyhow!(
-                "API key not found or invalid. Set up your xAI API key with:\n  \
-                 aiy credentials set xai"
+                "Unknown agent '{}'. Valid agents: {}\n\
+                 Use 'aiy agents list' to see available agents.",
+                id,
+                valid_agents_string()
             )
         }
-        GrokError::Transport(msg) => {
-            // Sanitize transport errors
-            let sanitized = sanitize_error_message(&msg);
-            anyhow::anyhow!("Network error: {}", sanitized)
+        AdapterCreationError::MissingCredentials(id) => {
+            let provider = get_credential_provider(&id);
+            anyhow::anyhow!(
+                "No credentials found for '{}'. Set up your API key with:\n  \
+                 aiy credentials set {}",
+                id,
+                provider
+            )
         }
-        GrokError::ApiRequest(_) => {
-            anyhow::anyhow!("API request failed. Check your network connection and API key.")
+        AdapterCreationError::CreationFailed(msg) => {
+            anyhow::anyhow!("Failed to create adapter: {}", msg)
         }
-        GrokError::ResponseParsing(msg) => {
-            anyhow::anyhow!("Failed to parse response from Grok API: {}", msg)
+        AdapterCreationError::HttpNotEnabled(id) => {
+            anyhow::anyhow!(
+                "HTTP transport not enabled for '{}'. Build with `--features http` for real API calls.",
+                id
+            )
         }
-        GrokError::Serialization(_) => {
-            anyhow::anyhow!("Failed to serialize request")
+        AdapterCreationError::Grok(e) => {
+            anyhow::anyhow!("Grok error: {}", e.to_sanitized_string())
         }
-        GrokError::SecurityValidation(msg) => {
-            anyhow::anyhow!("Security check failed: {}", msg)
+        AdapterCreationError::Claude(e) => {
+            anyhow::anyhow!("Claude error: {}", e.to_sanitized_string())
         }
-        GrokError::SchemaValidation(msg) => {
-            anyhow::anyhow!("Response validation failed: {}", msg)
+        AdapterCreationError::Gemini(e) => {
+            anyhow::anyhow!("Gemini error: {}", e.to_sanitized_string())
         }
-        GrokError::Other(msg) => {
-            anyhow::anyhow!("Error: {}", msg)
-        }
-        GrokError::RateLimit(msg) => {
-            anyhow::anyhow!("Rate limit exceeded: {}. Please try again later.", msg)
-        }
-        GrokError::Timeout(msg) => {
-            anyhow::anyhow!("Request timed out: {}. Try again or check your connection.", msg)
+        AdapterCreationError::Codex(e) => {
+            anyhow::anyhow!("Codex error: {}", e.to_sanitized_string())
         }
     }
 }
 
-/// Sanitize error messages to prevent secret leakage
-fn sanitize_error_message(msg: &str) -> String {
-    // Remove anything that looks like an API key or token
-    let mut sanitized = msg.to_string();
-
-    // Remove Bearer tokens
-    if let Some(start) = sanitized.find("Bearer ") {
-        let end = sanitized[start..]
-            .find(|c: char| c.is_whitespace() || c == '"' || c == '\'')
-            .map(|i| start + i)
-            .unwrap_or(sanitized.len());
-        sanitized.replace_range(start..end, "Bearer [REDACTED]");
+/// Get the credential provider for an agent
+fn get_credential_provider(agent_id: &str) -> &'static str {
+    match agent_id {
+        "grok" => "xai",
+        "claude" => "anthropic",
+        "gemini" => "google",
+        "codex" => "openai",
+        _ => "unknown",
     }
-
-    // Remove anything that looks like an API key (long alphanumeric strings)
-    let key_pattern = regex::Regex::new(r"[a-zA-Z0-9_-]{32,}").unwrap();
-    sanitized = key_pattern.replace_all(&sanitized, "[REDACTED]").to_string();
-
-    sanitized
 }
 
 #[cfg(test)]
@@ -290,29 +308,6 @@ mod tests {
     }
 
     #[test]
-    fn test_sanitize_error_message_bearer() {
-        let msg = "Authorization: Bearer sk-xai-abc123def456ghi789jkl012mno345pqr678";
-        let sanitized = sanitize_error_message(msg);
-        assert!(!sanitized.contains("sk-xai-abc123def456ghi789jkl012mno345pqr678"));
-        assert!(sanitized.contains("[REDACTED]"));
-    }
-
-    #[test]
-    fn test_sanitize_error_message_long_key() {
-        let msg = "API key xai_abcdefghijklmnopqrstuvwxyz123456 is invalid";
-        let sanitized = sanitize_error_message(msg);
-        assert!(!sanitized.contains("xai_abcdefghijklmnopqrstuvwxyz123456"));
-        assert!(sanitized.contains("[REDACTED]"));
-    }
-
-    #[test]
-    fn test_sanitize_error_message_no_secrets() {
-        let msg = "Connection timed out after 30 seconds";
-        let sanitized = sanitize_error_message(msg);
-        assert_eq!(sanitized, msg);
-    }
-
-    #[test]
     fn test_ask_args_creation() {
         let args = AskArgs {
             agent: "grok".to_string(),
@@ -325,19 +320,29 @@ mod tests {
     }
 
     #[test]
-    fn test_format_grok_error_credential() {
-        let error = GrokError::Credential("secret key".to_string());
-        let formatted = format_grok_error(error);
-        let msg = formatted.to_string();
-        assert!(!msg.contains("secret"));
-        assert!(msg.contains("aiy credentials set xai"));
+    fn test_get_credential_provider() {
+        assert_eq!(get_credential_provider("grok"), "xai");
+        assert_eq!(get_credential_provider("claude"), "anthropic");
+        assert_eq!(get_credential_provider("gemini"), "google");
+        assert_eq!(get_credential_provider("codex"), "openai");
+        assert_eq!(get_credential_provider("unknown"), "unknown");
     }
 
     #[test]
-    fn test_format_grok_error_transport() {
-        let error = GrokError::Transport("connection failed".to_string());
-        let formatted = format_grok_error(error);
+    fn test_format_adapter_error_unknown_agent() {
+        let error = AdapterCreationError::UnknownAgent("invalid".to_string());
+        let formatted = format_adapter_error(error);
         let msg = formatted.to_string();
-        assert!(msg.contains("Network error"));
+        assert!(msg.contains("Unknown agent"));
+        assert!(msg.contains("invalid"));
+    }
+
+    #[test]
+    fn test_format_adapter_error_missing_credentials() {
+        let error = AdapterCreationError::MissingCredentials("grok".to_string());
+        let formatted = format_adapter_error(error);
+        let msg = formatted.to_string();
+        assert!(msg.contains("No credentials found"));
+        assert!(msg.contains("aiy credentials set xai"));
     }
 }

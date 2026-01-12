@@ -2,9 +2,9 @@
 //!
 //! Provides the `aiy review <file>` command for reviewing code files using AI agents.
 
+use crate::adapters::create_review_adapter;
 use crate::registry::AGENTS;
 use aiy_adapters::{AgentAdapter, AgentReview, Severity, Verdict};
-use aiy_adapter_grok::{GrokAdapter, GrokClient};
 use aiy_core::security::{CredentialBackend, CredentialManager};
 use aiy_core::PipelineConfig;
 use colored::*;
@@ -29,7 +29,10 @@ impl std::str::FromStr for OutputFormat {
         match s.to_lowercase().as_str() {
             "pretty" => Ok(OutputFormat::Pretty),
             "json" => Ok(OutputFormat::Json),
-            _ => Err(format!("Unknown output format: {}. Use 'pretty' or 'json'", s)),
+            _ => Err(format!(
+                "Unknown output format: {}. Use 'pretty' or 'json'",
+                s
+            )),
         }
     }
 }
@@ -51,19 +54,6 @@ pub enum ReviewResult {
     Success,
     /// Review failed due to no reviews being completed (SECURITY: must exit non-zero)
     NoReviews,
-    /// Review completed but consensus blocked the artifact
-    Blocked,
-}
-
-impl ReviewResult {
-    /// Convert to exit code for CLI
-    pub fn exit_code(&self) -> i32 {
-        match self {
-            ReviewResult::Success => 0,
-            ReviewResult::NoReviews => 1,  // SECURITY: Empty reviews = failure
-            ReviewResult::Blocked => 2,    // Blocked by consensus
-        }
-    }
 }
 
 /// Run the review command
@@ -82,7 +72,10 @@ pub async fn run(args: ReviewArgs) -> anyhow::Result<ReviewResult> {
 
     // Determine which agents to use
     let requested_agents: Vec<String> = if let Some(agents_str) = &args.agents {
-        agents_str.split(',').map(|s| s.trim().to_string()).collect()
+        agents_str
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .collect()
     } else {
         config.enabled_agents.clone()
     };
@@ -106,7 +99,12 @@ pub async fn run(args: ReviewArgs) -> anyhow::Result<ReviewResult> {
         // Generate credential hints from registry
         let hints: Vec<String> = AGENTS
             .iter()
-            .map(|a| format!("aiy credentials set {:10} # for {}", a.credential_provider, a.display_name))
+            .map(|a| {
+                format!(
+                    "aiy credentials set {:10} # for {}",
+                    a.credential_provider, a.display_name
+                )
+            })
             .collect();
         anyhow::bail!(
             "No agents available. Set up credentials with:\n  {}",
@@ -124,7 +122,9 @@ pub async fn run(args: ReviewArgs) -> anyhow::Result<ReviewResult> {
     let pb = ProgressBar::new(adapters.len() as u64);
     pb.set_style(
         ProgressStyle::default_bar()
-            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({msg})")
+            .template(
+                "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({msg})",
+            )
             .expect("Invalid progress bar template")
             .progress_chars("#>-"),
     );
@@ -169,9 +169,8 @@ pub async fn run(args: ReviewArgs) -> anyhow::Result<ReviewResult> {
     // =========================================================================
     if reviews.is_empty() {
         eprintln!(
-            "\n{}: {}",
-            "SECURITY".red().bold(),
-            "No reviews completed. Cannot determine safety."
+            "\n{}: No reviews completed. Cannot determine safety.",
+            "SECURITY".red().bold()
         );
         eprintln!(
             "{}",
@@ -196,12 +195,15 @@ pub async fn run(args: ReviewArgs) -> anyhow::Result<ReviewResult> {
 /// Create adapters based on configuration and requested agents
 ///
 /// Iterates over the agent registry to create adapters for requested agents.
-/// Only agents with implemented adapters will be created.
+/// Uses the adapter factory to create adapters for all supported agents.
 async fn create_adapters(
     config: &PipelineConfig,
     requested_agents: &[String],
 ) -> anyhow::Result<Vec<Box<dyn AgentAdapter>>> {
     let mut adapters: Vec<Box<dyn AgentAdapter>> = Vec::new();
+
+    // Get credential manager
+    let credential_manager = get_credential_manager(config)?;
 
     // Iterate over registry to create adapters for requested agents
     for agent in AGENTS {
@@ -209,23 +211,18 @@ async fn create_adapters(
             continue;
         }
 
-        // Create adapter based on agent ID
-        // Each agent has its own adapter creation function
-        match agent.id {
-            "grok" => {
-                if let Ok(grok) = create_grok_adapter(config).await {
-                    adapters.push(Box::new(grok));
-                }
+        // Use the adapter factory to create the adapter
+        match create_review_adapter(agent.id, credential_manager.clone()).await {
+            Ok(adapter) => {
+                adapters.push(adapter);
             }
-            // Future adapters: Add match arms for claude, gemini, codex when their
-            // adapter crates are implemented (aiy-adapter-claude, aiy-adapter-gemini,
-            // aiy-adapter-codex). Each should follow the same pattern as grok above.
-            _ => {
-                // Agent is registered but adapter not yet implemented
+            Err(e) => {
+                // Log the error but continue with other agents
                 eprintln!(
-                    "{}: Adapter for '{}' not yet implemented",
+                    "{}: Failed to create adapter for '{}': {}",
                     "Warning".yellow(),
-                    agent.display_name
+                    agent.display_name,
+                    e
                 );
             }
         }
@@ -234,28 +231,10 @@ async fn create_adapters(
     Ok(adapters)
 }
 
-/// Create a Grok adapter with proper credential management
-async fn create_grok_adapter(config: &PipelineConfig) -> anyhow::Result<GrokAdapter> {
-    let manager = get_credential_manager(config)?;
-
-    // Check if credentials are available
-    {
-        let mgr = manager.lock().await;
-        if mgr.get_key("xai").is_err() && mgr.get_key("grok").is_err() {
-            anyhow::bail!("No credentials found for Grok. Set with: aiy credentials set xai");
-        }
-    }
-
-    // Use mock transport with canned response for now
-    // In production, we'd use ReqwestTransport with http feature
-    let transport = Arc::new(aiy_adapter_grok::MockTransport::with_canned_response(mock_review_response()));
-
-    let client = GrokClient::new_with_mock(manager, transport);
-    Ok(GrokAdapter::new(client))
-}
-
 /// Get credential manager based on config
-fn get_credential_manager(config: &PipelineConfig) -> anyhow::Result<Arc<Mutex<CredentialManager>>> {
+fn get_credential_manager(
+    config: &PipelineConfig,
+) -> anyhow::Result<Arc<Mutex<CredentialManager>>> {
     // Try system keychain first if preferred
     if config.credential_backend == "system" {
         if let Ok(manager) = CredentialManager::new(CredentialBackend::SystemKeychain) {
@@ -270,24 +249,6 @@ fn get_credential_manager(config: &PipelineConfig) -> anyhow::Result<Arc<Mutex<C
 
     let manager = CredentialManager::new(CredentialBackend::EncryptedFile { path: cred_path })?;
     Ok(Arc::new(Mutex::new(manager)))
-}
-
-/// Mock review response for testing
-fn mock_review_response() -> String {
-    r#"{
-        "id": "mock-id",
-        "object": "chat.completion",
-        "created": 1234567890,
-        "model": "grok-2",
-        "choices": [{
-            "index": 0,
-            "message": {
-                "role": "assistant",
-                "content": "{\"agent_id\":\"grok\",\"verdict\":\"pass\",\"confidence\":0.95,\"issues\":[],\"suggestions\":[\"Consider adding more documentation\"],\"sign_off\":true,\"reasoning\":\"Code looks clean and follows best practices.\"}"
-            },
-            "finish_reason": "stop"
-        }]
-    }"#.to_string()
 }
 
 /// Display results in pretty format with colors
@@ -327,7 +288,10 @@ fn display_pretty_results(reviews: &[AgentReview]) {
                     Severity::Nit => "NIT".white(),
                 };
 
-                println!("  - {} {}: {}", severity_color, issue.category, issue.description);
+                println!(
+                    "  - {} {}: {}",
+                    severity_color, issue.category, issue.description
+                );
                 if let Some(location) = &issue.location {
                     println!("    Location: {}", location.dimmed());
                 }
@@ -361,7 +325,12 @@ fn display_pretty_results(reviews: &[AgentReview]) {
     } else if pass_count > total / 2 {
         format!("{} ({}/{} approve)", "PASS".green(), pass_count, total)
     } else if pass_count == total / 2 && total > 1 {
-        format!("{} ({}/{} approve)", "SPLIT".yellow().bold(), pass_count, total)
+        format!(
+            "{} ({}/{} approve)",
+            "SPLIT".yellow().bold(),
+            pass_count,
+            total
+        )
     } else {
         format!("{} ({}/{} approve)", "FAIL".red().bold(), pass_count, total)
     };
@@ -372,16 +341,40 @@ fn display_pretty_results(reviews: &[AgentReview]) {
 
     // Issue summary
     if !all_issues.is_empty() {
-        let critical = all_issues.iter().filter(|i| i.severity == Severity::Critical).count();
-        let major = all_issues.iter().filter(|i| i.severity == Severity::Major).count();
-        let minor = all_issues.iter().filter(|i| i.severity == Severity::Minor).count();
-        let nit = all_issues.iter().filter(|i| i.severity == Severity::Nit).count();
+        let critical = all_issues
+            .iter()
+            .filter(|i| i.severity == Severity::Critical)
+            .count();
+        let major = all_issues
+            .iter()
+            .filter(|i| i.severity == Severity::Major)
+            .count();
+        let minor = all_issues
+            .iter()
+            .filter(|i| i.severity == Severity::Minor)
+            .count();
+        let nit = all_issues
+            .iter()
+            .filter(|i| i.severity == Severity::Nit)
+            .count();
 
         println!(
             "Issues found: {} critical, {} major, {} minor, {} nit",
-            if critical > 0 { format!("{}", critical).red().to_string() } else { "0".to_string() },
-            if major > 0 { format!("{}", major).red().to_string() } else { "0".to_string() },
-            if minor > 0 { format!("{}", minor).yellow().to_string() } else { "0".to_string() },
+            if critical > 0 {
+                format!("{}", critical).red().to_string()
+            } else {
+                "0".to_string()
+            },
+            if major > 0 {
+                format!("{}", major).red().to_string()
+            } else {
+                "0".to_string()
+            },
+            if minor > 0 {
+                format!("{}", minor).yellow().to_string()
+            } else {
+                "0".to_string()
+            },
             nit
         );
     } else {
@@ -418,16 +411,18 @@ mod tests {
 
     #[test]
     fn test_output_format_parsing() {
-        assert!(matches!("pretty".parse::<OutputFormat>(), Ok(OutputFormat::Pretty)));
-        assert!(matches!("json".parse::<OutputFormat>(), Ok(OutputFormat::Json)));
-        assert!(matches!("PRETTY".parse::<OutputFormat>(), Ok(OutputFormat::Pretty)));
+        assert!(matches!(
+            "pretty".parse::<OutputFormat>(),
+            Ok(OutputFormat::Pretty)
+        ));
+        assert!(matches!(
+            "json".parse::<OutputFormat>(),
+            Ok(OutputFormat::Json)
+        ));
+        assert!(matches!(
+            "PRETTY".parse::<OutputFormat>(),
+            Ok(OutputFormat::Pretty)
+        ));
         assert!("unknown".parse::<OutputFormat>().is_err());
-    }
-
-    #[test]
-    fn test_mock_review_response() {
-        let response = mock_review_response();
-        assert!(response.contains("grok"));
-        assert!(response.contains("pass"));
     }
 }

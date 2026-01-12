@@ -62,8 +62,9 @@ async fn test_credential_retrieval_xai_provider() {
         }]
     }"#;
 
-    let mock_transport =
-        Arc::new(MockTransport::with_canned_response(mock_response.to_string()));
+    let mock_transport = Arc::new(MockTransport::with_canned_response(
+        mock_response.to_string(),
+    ));
     let client = GrokClient::new_with_mock(creds, mock_transport);
 
     let response = client.generate_text("Test").await.unwrap();
@@ -92,8 +93,9 @@ async fn test_credential_fallback_to_grok() {
         }]
     }"#;
 
-    let mock_transport =
-        Arc::new(MockTransport::with_canned_response(mock_response.to_string()));
+    let mock_transport = Arc::new(MockTransport::with_canned_response(
+        mock_response.to_string(),
+    ));
     let client = GrokClient::new_with_mock(creds, mock_transport);
 
     let response = client.generate_text("Test").await.unwrap();
@@ -145,8 +147,9 @@ async fn test_sanitization_integration() {
         }]
     }"#;
 
-    let mock_transport =
-        Arc::new(MockTransport::with_canned_response(mock_response.to_string()));
+    let mock_transport = Arc::new(MockTransport::with_canned_response(
+        mock_response.to_string(),
+    ));
     let client = GrokClient::new_with_mock(creds, mock_transport);
     let adapter = GrokAdapter::new(client);
 
@@ -224,8 +227,9 @@ async fn test_schema_validation_rejects_invalid_json() {
         }]
     }"#;
 
-    let mock_transport =
-        Arc::new(MockTransport::with_canned_response(invalid_schema.to_string()));
+    let mock_transport = Arc::new(MockTransport::with_canned_response(
+        invalid_schema.to_string(),
+    ));
     let client = GrokClient::new_with_mock(creds, mock_transport);
     let adapter = GrokAdapter::new(client);
 

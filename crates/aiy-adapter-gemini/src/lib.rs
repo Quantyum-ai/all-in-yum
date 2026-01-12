@@ -36,11 +36,15 @@
 pub mod client;
 pub mod error;
 pub mod models;
+pub mod transport;
 pub mod types;
 
 pub use client::GeminiClient;
 pub use error::GeminiError;
 pub use models::GeminiModel;
+#[cfg(feature = "http")]
+pub use transport::ReqwestTransport;
+pub use transport::{HttpTransport, MockTransport};
 pub use types::{Content, GeminiRequest, GeminiResponse, GenerationConfig, Part};
 
 use aiy_adapters::{AdapterError, AgentAdapter, AgentReview};
@@ -69,7 +73,10 @@ impl GeminiAdapter {
     /// 2. Builds a secure review prompt
     /// 3. Validates the response
     /// 4. Enforces schema compliance
-    pub async fn review_artifact_internal(&self, artifact: &str) -> Result<AgentReview, GeminiError> {
+    pub async fn review_artifact_internal(
+        &self,
+        artifact: &str,
+    ) -> Result<AgentReview, GeminiError> {
         self.client.review_artifact(artifact).await
     }
 }
@@ -96,10 +103,10 @@ impl AgentAdapter for GeminiAdapter {
 mod tests {
     use super::*;
     use aiy_core::security::{CredentialBackend, CredentialManager};
-    use client::MockTransport;
     use std::sync::Arc;
     use tempfile::TempDir;
     use tokio::sync::Mutex;
+    use transport::MockTransport;
 
     fn setup_test_credential_manager() -> (Arc<Mutex<CredentialManager>>, TempDir) {
         let temp_dir = TempDir::new().unwrap();

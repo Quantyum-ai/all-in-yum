@@ -457,7 +457,9 @@ mod offline_tests {
             }]
         }"#;
 
-        let transport = Arc::new(MockTransport::with_canned_response(mock_response.to_string()));
+        let transport = Arc::new(MockTransport::with_canned_response(
+            mock_response.to_string(),
+        ));
         let client = GrokClient::new_with_mock(creds, transport);
 
         let response = client.generate_text("Hello").await.unwrap();

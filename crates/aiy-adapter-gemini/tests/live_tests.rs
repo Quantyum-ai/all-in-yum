@@ -9,7 +9,7 @@
 //!
 //! # Running
 //! ```bash
-//! AIY_LIVE_TESTS=1 GOOGLE_API_KEY=xxx cargo test -p aiy-adapter-gemini --test live_tests -- --ignored
+//! AIY_LIVE_TESTS=1 GOOGLE_API_KEY=xxx cargo test -p aiy-adapter-gemini --features http --test live_tests -- --ignored
 //! ```
 //!
 //! # Notes
@@ -18,6 +18,8 @@
 //! - Tests are marked with `#[ignore]` so they don't run in normal CI
 //! - SECURITY: The API key is passed as a query parameter (Google's design),
 //!   so URLs should never be logged
+
+#![cfg(feature = "http")]
 
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -166,11 +168,12 @@ async fn test_live_gemini_happy_path() {
         .expect("Failed to parse Gemini API response");
 
     // Verify we got a response
-    let candidates = body
-        .candidates
-        .expect("Gemini API returned no candidates");
+    let candidates = body.candidates.expect("Gemini API returned no candidates");
 
-    assert!(!candidates.is_empty(), "Gemini API returned empty candidates");
+    assert!(
+        !candidates.is_empty(),
+        "Gemini API returned empty candidates"
+    );
 
     let text = candidates[0].content.parts[0]
         .text

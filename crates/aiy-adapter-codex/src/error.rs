@@ -60,6 +60,17 @@ impl From<aiy_core::security::sanitization::SanitizationError> for CodexError {
 }
 
 impl CodexError {
+    /// Check if this error is retryable.
+    ///
+    /// Returns true for transient errors like rate limits, timeouts, and transport errors.
+    /// Returns false for permanent errors like auth failures or parsing errors.
+    pub fn is_retryable(&self) -> bool {
+        matches!(
+            self,
+            Self::RateLimit(_) | Self::Timeout(_) | Self::Transport(_)
+        )
+    }
+
     /// Get the error kind for this error.
     ///
     /// Maps internal error variants to the standardized `AdapterErrorKind`.
@@ -139,7 +150,10 @@ mod tests {
     fn test_response_parsing_preserved() {
         let err = CodexError::ResponseParsing("invalid JSON at position 42".to_string());
         let sanitized = err.to_sanitized_string();
-        assert_eq!(sanitized, "Response parsing failed: invalid JSON at position 42");
+        assert_eq!(
+            sanitized,
+            "Response parsing failed: invalid JSON at position 42"
+        );
     }
 
     #[test]
@@ -156,7 +170,10 @@ mod tests {
     fn test_schema_validation_preserved() {
         let err = CodexError::SchemaValidation("missing field 'verdict'".to_string());
         let sanitized = err.to_sanitized_string();
-        assert_eq!(sanitized, "Schema validation failed: missing field 'verdict'");
+        assert_eq!(
+            sanitized,
+            "Schema validation failed: missing field 'verdict'"
+        );
     }
 
     #[test]

@@ -13,12 +13,15 @@ path = "src/main.rs"
 
 [features]
 default = []
-http = ["aiy-adapter-grok/http"]
+http = ["aiy-adapter-grok/http", "aiy-adapter-claude/http", "aiy-adapter-codex/http"]
 
 [dependencies]
 aiy-core = { path = "../aiy-core" }
 aiy-adapters = { path = "../aiy-adapters" }
 aiy-adapter-grok = { path = "../aiy-adapter-grok" }
+aiy-adapter-claude = { path = "../aiy-adapter-claude" }
+aiy-adapter-gemini = { path = "../aiy-adapter-gemini" }
+aiy-adapter-codex = { path = "../aiy-adapter-codex" }
 clap.workspace = true
 tokio.workspace = true
 anyhow.workspace = true

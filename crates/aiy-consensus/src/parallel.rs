@@ -10,6 +10,21 @@ use tokio::time::timeout;
 pub const DEFAULT_TIMEOUT_MS: u64 = 30_000;
 
 /// Execute a single agent review with timeout handling.
+///
+/// Wraps the adapter's `review_artifact` call with a timeout. Returns an
+/// [`AgentOutcome`] indicating success, failure, or timeout.
+///
+/// # Arguments
+///
+/// * `adapter` - The agent adapter to execute
+/// * `artifact` - The code or content to review
+/// * `timeout_duration` - Maximum time to wait for the review
+///
+/// # Returns
+///
+/// - `AgentOutcome::Success` if the review completes successfully
+/// - `AgentOutcome::Failure` if the adapter returns an error
+/// - `AgentOutcome::Timeout` if the operation exceeds the timeout
 pub async fn execute_agent_with_timeout(
     adapter: &dyn AgentAdapter,
     artifact: &str,
@@ -52,6 +67,20 @@ pub async fn execute_agents_parallel(
 }
 
 /// Execute multiple agents sequentially (useful for testing/debugging).
+///
+/// Unlike [`execute_agents_parallel`], this function runs each adapter one
+/// at a time. This is useful for debugging or when parallel execution is
+/// not desired.
+///
+/// # Arguments
+///
+/// * `adapters` - Slice of agent adapters to execute
+/// * `artifact` - The code or content to review
+/// * `timeout_duration` - Maximum time to wait for each individual review
+///
+/// # Returns
+///
+/// A vector of [`AgentOutcome`] in the same order as the input adapters.
 pub async fn execute_agents_sequential(
     adapters: &[Box<dyn AgentAdapter>],
     artifact: &str,
@@ -60,7 +89,8 @@ pub async fn execute_agents_sequential(
     let mut outcomes = Vec::with_capacity(adapters.len());
 
     for adapter in adapters {
-        let outcome = execute_agent_with_timeout(adapter.as_ref(), artifact, timeout_duration).await;
+        let outcome =
+            execute_agent_with_timeout(adapter.as_ref(), artifact, timeout_duration).await;
         outcomes.push(outcome);
     }
 
@@ -68,6 +98,17 @@ pub async fn execute_agents_sequential(
 }
 
 /// Filter successful outcomes and extract reviews.
+///
+/// Iterates through agent outcomes and extracts the `AgentReview` from
+/// each successful outcome, discarding failures and timeouts.
+///
+/// # Arguments
+///
+/// * `outcomes` - Slice of agent outcomes to filter
+///
+/// # Returns
+///
+/// A vector containing only the successful reviews.
 pub fn extract_successful_reviews(outcomes: &[AgentOutcome]) -> Vec<AgentReview> {
     outcomes
         .iter()
@@ -76,6 +117,17 @@ pub fn extract_successful_reviews(outcomes: &[AgentOutcome]) -> Vec<AgentReview>
 }
 
 /// Collect errors from failed outcomes.
+///
+/// Converts failures and timeouts into [`ConsensusError`] instances for
+/// error reporting and logging. Successful outcomes are skipped.
+///
+/// # Arguments
+///
+/// * `outcomes` - Slice of agent outcomes to process
+///
+/// # Returns
+///
+/// A vector of errors from failed or timed-out agents.
 pub fn collect_errors(outcomes: &[AgentOutcome]) -> Vec<ConsensusError> {
     outcomes
         .iter()
@@ -93,6 +145,17 @@ pub fn collect_errors(outcomes: &[AgentOutcome]) -> Vec<ConsensusError> {
 }
 
 /// Calculate success rate from outcomes.
+///
+/// Computes the ratio of successful outcomes to total outcomes.
+///
+/// # Arguments
+///
+/// * `outcomes` - Slice of agent outcomes to analyze
+///
+/// # Returns
+///
+/// A value between 0.0 and 1.0 representing the success rate.
+/// Returns 0.0 if the outcomes slice is empty.
 pub fn calculate_success_rate(outcomes: &[AgentOutcome]) -> f64 {
     if outcomes.is_empty() {
         return 0.0;
@@ -178,7 +241,10 @@ mod tests {
         }
 
         async fn review_artifact(&self, _artifact: &str) -> Result<AgentReview, AdapterError> {
-            Err(AdapterError::new(AdapterErrorKind::Unknown, &self.error_message))
+            Err(AdapterError::new(
+                AdapterErrorKind::Unknown,
+                &self.error_message,
+            ))
         }
     }
 

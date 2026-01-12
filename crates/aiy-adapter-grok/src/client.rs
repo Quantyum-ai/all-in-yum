@@ -5,11 +5,11 @@ use crate::models::GrokModel;
 use crate::transport::HttpTransport;
 use crate::types::{ChatMessage, ChatRequest, ChatResponse, MessageRole};
 use aiy_adapters::AgentReview;
-use aiy_core::security::CredentialManager;
 use aiy_core::security::sanitization::{
     build_secure_review_prompt, sanitize_artifact_content, validate_review_response,
     validate_review_schema,
 };
+use aiy_core::security::CredentialManager;
 use serde_json::Value;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -286,7 +286,9 @@ mod tests {
             }]
         }"#;
 
-        let mock_transport = Arc::new(MockTransport::with_canned_response(mock_response.to_string()));
+        let mock_transport = Arc::new(MockTransport::with_canned_response(
+            mock_response.to_string(),
+        ));
         let client = GrokClient::new_with_mock(manager, mock_transport);
 
         let response = client.generate_text("Hello").await.unwrap();
@@ -303,7 +305,9 @@ mod tests {
         }
 
         let mock_response = r#"{"id":"test","object":"chat.completion","created":1234567890,"model":"grok-4-1-fast","choices":[{"index":0,"message":{"role":"assistant","content":"OK"},"finish_reason":"stop"}]}"#;
-        let mock_transport = Arc::new(MockTransport::with_canned_response(mock_response.to_string()));
+        let mock_transport = Arc::new(MockTransport::with_canned_response(
+            mock_response.to_string(),
+        ));
 
         let client = GrokClient::new_with_mock(manager, mock_transport);
         let _ = client.generate_text("Test").await;

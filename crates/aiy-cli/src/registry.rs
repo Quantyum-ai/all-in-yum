@@ -82,8 +82,14 @@ pub fn all_agent_ids() -> impl Iterator<Item = &'static str> {
     AGENTS.iter().map(|a| a.id)
 }
 
-/// Get a comma-separated string of all valid agent IDs
-/// Useful for error messages
+/// Get a comma-separated string of all valid agent IDs.
+///
+/// Useful for error messages and help text that need to display
+/// all available agents.
+///
+/// # Returns
+///
+/// A comma-separated string like "grok, claude, gemini, codex".
 pub fn valid_agents_string() -> String {
     all_agent_ids().collect::<Vec<_>>().join(", ")
 }
@@ -146,8 +152,14 @@ mod tests {
     fn test_all_agents_have_required_fields() {
         for agent in AGENTS {
             assert!(!agent.id.is_empty(), "Agent ID should not be empty");
-            assert!(!agent.display_name.is_empty(), "Display name should not be empty");
-            assert!(!agent.credential_provider.is_empty(), "Credential provider should not be empty");
+            assert!(
+                !agent.display_name.is_empty(),
+                "Display name should not be empty"
+            );
+            assert!(
+                !agent.credential_provider.is_empty(),
+                "Credential provider should not be empty"
+            );
         }
     }
 

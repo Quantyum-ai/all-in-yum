@@ -59,6 +59,8 @@
 //!    explaining the consensus decision, key points from reviews, and any
 //!    areas requiring attention.
 
+#![warn(missing_docs)]
+
 // Core consensus modules (Agent 7 - Consensus Core)
 pub mod engine;
 pub mod error;
@@ -194,8 +196,7 @@ mod tests {
         assert!(avg_confidence > 0.9);
 
         // Step 5: Generate reasoning
-        let reasoning =
-            ReasoningGenerator::generate(&reviews, overall_verdict, &disagreements);
+        let reasoning = ReasoningGenerator::generate(&reviews, overall_verdict, &disagreements);
         assert!(reasoning.contains("PASS"));
         assert!(reasoning.contains("grok"));
         assert!(reasoning.contains("claude"));

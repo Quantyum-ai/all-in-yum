@@ -50,6 +50,7 @@ struct MessagesResponse {
 #[derive(Deserialize)]
 struct ContentBlock {
     #[serde(rename = "type")]
+    #[allow(dead_code)] // Required for serde deserialization
     content_type: String,
     text: Option<String>,
 }
@@ -134,7 +135,10 @@ async fn test_live_claude_happy_path() {
         .expect("Failed to parse Anthropic API response");
 
     // Verify we got a response
-    assert!(!body.content.is_empty(), "Anthropic API returned no content blocks");
+    assert!(
+        !body.content.is_empty(),
+        "Anthropic API returned no content blocks"
+    );
 
     let text = body.content[0]
         .text

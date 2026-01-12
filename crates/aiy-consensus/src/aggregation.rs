@@ -88,9 +88,9 @@ impl IssueAggregator {
         for review in reviews {
             for issue in &review.issues {
                 // Try to find an existing aggregated issue to merge with
-                let matching_idx = aggregated.iter().position(|agg| {
-                    Self::issues_similar(issue, &agg.original_issues[0])
-                });
+                let matching_idx = aggregated
+                    .iter()
+                    .position(|agg| Self::issues_similar(issue, &agg.original_issues[0]));
 
                 if let Some(idx) = matching_idx {
                     aggregated[idx].merge(issue.clone(), review.agent_id.clone(), total_agents);
@@ -105,9 +105,12 @@ impl IssueAggregator {
 
         // Sort by severity (most severe first) then by confidence
         aggregated.sort_by(|a, b| {
-            let severity_cmp = severity_rank(b.agreed_severity).cmp(&severity_rank(a.agreed_severity));
+            let severity_cmp =
+                severity_rank(b.agreed_severity).cmp(&severity_rank(a.agreed_severity));
             if severity_cmp == std::cmp::Ordering::Equal {
-                b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal)
+                b.confidence
+                    .partial_cmp(&a.confidence)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             } else {
                 severity_cmp
             }
@@ -128,9 +131,9 @@ impl IssueAggregator {
         let mut unique: Vec<Issue> = Vec::new();
 
         for issue in issues {
-            let matching_idx = unique.iter().position(|existing| {
-                Self::issues_similar(issue, existing)
-            });
+            let matching_idx = unique
+                .iter()
+                .position(|existing| Self::issues_similar(issue, existing));
 
             if let Some(idx) = matching_idx {
                 // Keep the more severe one
@@ -218,7 +221,8 @@ fn locations_similar(a: &str, b: &str) -> bool {
     if !parts_a.is_empty() && !parts_b.is_empty() && parts_a[0] == parts_b[0] {
         // If we have line numbers, check if they're close (within 5 lines)
         if parts_a.len() > 1 && parts_b.len() > 1 {
-            if let (Ok(line_a), Ok(line_b)) = (parts_a[1].parse::<i64>(), parts_b[1].parse::<i64>()) {
+            if let (Ok(line_a), Ok(line_b)) = (parts_a[1].parse::<i64>(), parts_b[1].parse::<i64>())
+            {
                 return (line_a - line_b).abs() <= 5;
             }
         }
@@ -316,6 +320,17 @@ fn most_severe(a: Severity, b: Severity) -> Severity {
 }
 
 /// Calculate the average confidence from a list of agent reviews.
+///
+/// Computes the arithmetic mean of all agent confidence scores.
+///
+/// # Arguments
+///
+/// * `reviews` - Slice of agent reviews to analyze
+///
+/// # Returns
+///
+/// The average confidence as a value between 0.0 and 1.0.
+/// Returns 0.0 if the reviews slice is empty.
 pub fn calculate_average_confidence(reviews: &[AgentReview]) -> f64 {
     if reviews.is_empty() {
         return 0.0;
@@ -324,14 +339,35 @@ pub fn calculate_average_confidence(reviews: &[AgentReview]) -> f64 {
 }
 
 /// Determine the overall verdict based on individual verdicts and a threshold.
+///
+/// Applies voting logic to determine the final consensus verdict:
+/// - Any `Block` verdict typically results in `Block` overall
+/// - If passes exceed threshold and blocks are < 25%, returns `Issue`
+/// - If passes exceed threshold with no blocks, returns `Pass`
+/// - Otherwise returns `Issue`
+///
+/// # Arguments
+///
+/// * `reviews` - Slice of agent reviews to analyze
+/// * `pass_threshold` - Fraction of agents that must pass (0.0 to 1.0)
+///
+/// # Returns
+///
+/// The overall consensus verdict. Returns `Block` if reviews is empty.
 pub fn determine_overall_verdict(reviews: &[AgentReview], pass_threshold: f64) -> Verdict {
     if reviews.is_empty() {
         return Verdict::Block;
     }
 
     let total = reviews.len() as f64;
-    let pass_count = reviews.iter().filter(|r| r.verdict == Verdict::Pass).count() as f64;
-    let block_count = reviews.iter().filter(|r| r.verdict == Verdict::Block).count() as f64;
+    let pass_count = reviews
+        .iter()
+        .filter(|r| r.verdict == Verdict::Pass)
+        .count() as f64;
+    let block_count = reviews
+        .iter()
+        .filter(|r| r.verdict == Verdict::Block)
+        .count() as f64;
 
     // Any block means the overall verdict is Block
     if block_count > 0.0 {
@@ -384,7 +420,12 @@ mod tests {
 
     #[test]
     fn test_merge_single_review() {
-        let issue = make_issue(Severity::Minor, "security", "SQL injection risk", Some("db.rs:42"));
+        let issue = make_issue(
+            Severity::Minor,
+            "security",
+            "SQL injection risk",
+            Some("db.rs:42"),
+        );
         let review = make_review("grok", Verdict::Issue, vec![issue.clone()]);
 
         let result = IssueAggregator::merge_issues(&[review]);
@@ -396,8 +437,18 @@ mod tests {
 
     #[test]
     fn test_merge_similar_issues_from_multiple_agents() {
-        let issue1 = make_issue(Severity::Minor, "security", "SQL injection vulnerability", Some("db.rs:42"));
-        let issue2 = make_issue(Severity::Major, "security", "SQL injection risk detected", Some("db.rs:44"));
+        let issue1 = make_issue(
+            Severity::Minor,
+            "security",
+            "SQL injection vulnerability",
+            Some("db.rs:42"),
+        );
+        let issue2 = make_issue(
+            Severity::Major,
+            "security",
+            "SQL injection risk detected",
+            Some("db.rs:44"),
+        );
 
         let review1 = make_review("grok", Verdict::Issue, vec![issue1]);
         let review2 = make_review("claude", Verdict::Issue, vec![issue2]);
@@ -414,8 +465,18 @@ mod tests {
 
     #[test]
     fn test_merge_different_issues_stay_separate() {
-        let issue1 = make_issue(Severity::Minor, "security", "SQL injection", Some("db.rs:42"));
-        let issue2 = make_issue(Severity::Minor, "performance", "Slow loop", Some("engine.rs:100"));
+        let issue1 = make_issue(
+            Severity::Minor,
+            "security",
+            "SQL injection",
+            Some("db.rs:42"),
+        );
+        let issue2 = make_issue(
+            Severity::Minor,
+            "performance",
+            "Slow loop",
+            Some("engine.rs:100"),
+        );
 
         let review1 = make_review("grok", Verdict::Issue, vec![issue1]);
         let review2 = make_review("claude", Verdict::Issue, vec![issue2]);
@@ -432,8 +493,18 @@ mod tests {
 
     #[test]
     fn test_deduplicate_keeps_most_severe() {
-        let issue1 = make_issue(Severity::Minor, "security", "SQL injection risk", Some("db.rs:42"));
-        let issue2 = make_issue(Severity::Critical, "security", "SQL injection vulnerability", Some("db.rs:42"));
+        let issue1 = make_issue(
+            Severity::Minor,
+            "security",
+            "SQL injection risk",
+            Some("db.rs:42"),
+        );
+        let issue2 = make_issue(
+            Severity::Critical,
+            "security",
+            "SQL injection vulnerability",
+            Some("db.rs:42"),
+        );
 
         let result = IssueAggregator::deduplicate(&[issue1, issue2]);
         assert_eq!(result.len(), 1);
@@ -452,7 +523,10 @@ mod tests {
             make_issue(Severity::Minor, "test", "desc", None),
             make_issue(Severity::Major, "test", "desc", None),
         ];
-        assert_eq!(IssueAggregator::calculate_severity(&issues), Severity::Minor);
+        assert_eq!(
+            IssueAggregator::calculate_severity(&issues),
+            Severity::Minor
+        );
     }
 
     #[test]
@@ -461,7 +535,10 @@ mod tests {
             make_issue(Severity::Minor, "test", "desc", None),
             make_issue(Severity::Major, "test", "desc", None),
         ];
-        assert_eq!(IssueAggregator::calculate_severity(&issues), Severity::Major);
+        assert_eq!(
+            IssueAggregator::calculate_severity(&issues),
+            Severity::Major
+        );
     }
 
     #[test]
@@ -486,17 +563,26 @@ mod tests {
 
     #[test]
     fn test_descriptions_similar_exact() {
-        assert!(descriptions_similar("SQL injection risk", "SQL injection risk"));
+        assert!(descriptions_similar(
+            "SQL injection risk",
+            "SQL injection risk"
+        ));
     }
 
     #[test]
     fn test_descriptions_similar_case_insensitive() {
-        assert!(descriptions_similar("SQL Injection Risk", "sql injection risk"));
+        assert!(descriptions_similar(
+            "SQL Injection Risk",
+            "sql injection risk"
+        ));
     }
 
     #[test]
     fn test_descriptions_similar_subset() {
-        assert!(descriptions_similar("SQL injection", "potential SQL injection vulnerability"));
+        assert!(descriptions_similar(
+            "SQL injection",
+            "potential SQL injection vulnerability"
+        ));
     }
 
     #[test]
@@ -581,7 +667,7 @@ mod tests {
 
         assert_eq!(agg.reporting_agents.len(), 2);
         assert_eq!(agg.agreed_severity, Severity::Major); // More severe
-        assert!((agg.confidence - 2.0/3.0).abs() < 0.001); // 2/3 agents
+        assert!((agg.confidence - 2.0 / 3.0).abs() < 0.001); // 2/3 agents
         assert!(agg.merged_description.contains("issue one"));
         assert!(agg.merged_description.contains("issue two"));
     }

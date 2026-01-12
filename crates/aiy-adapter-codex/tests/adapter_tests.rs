@@ -64,8 +64,9 @@ async fn test_credential_retrieval_openai_provider() {
         }]
     }"#;
 
-    let mock_transport =
-        Arc::new(MockTransport::with_canned_response(mock_response.to_string()));
+    let mock_transport = Arc::new(MockTransport::with_canned_response(
+        mock_response.to_string(),
+    ));
     let client = CodexClient::new_with_mock(creds, mock_transport);
 
     let response = client.generate_text("Test").await.unwrap();
@@ -95,8 +96,9 @@ async fn test_credential_fallback_to_codex() {
         }]
     }"#;
 
-    let mock_transport =
-        Arc::new(MockTransport::with_canned_response(mock_response.to_string()));
+    let mock_transport = Arc::new(MockTransport::with_canned_response(
+        mock_response.to_string(),
+    ));
     let client = CodexClient::new_with_mock(creds, mock_transport);
 
     let response = client.generate_text("Test").await.unwrap();
@@ -150,8 +152,9 @@ async fn test_sanitization_integration() {
         }]
     }"#;
 
-    let mock_transport =
-        Arc::new(MockTransport::with_canned_response(mock_response.to_string()));
+    let mock_transport = Arc::new(MockTransport::with_canned_response(
+        mock_response.to_string(),
+    ));
     let client = CodexClient::new_with_mock(creds, mock_transport);
     let adapter = CodexAdapter::new(client);
 
@@ -231,8 +234,9 @@ async fn test_schema_validation_rejects_invalid_json() {
         }]
     }"#;
 
-    let mock_transport =
-        Arc::new(MockTransport::with_canned_response(invalid_schema.to_string()));
+    let mock_transport = Arc::new(MockTransport::with_canned_response(
+        invalid_schema.to_string(),
+    ));
     let client = CodexClient::new_with_mock(creds, mock_transport);
     let adapter = CodexAdapter::new(client);
 
@@ -282,16 +286,14 @@ async fn test_empty_response_handling() {
         "choices": []
     }"#;
 
-    let mock_transport =
-        Arc::new(MockTransport::with_canned_response(empty_response.to_string()));
+    let mock_transport = Arc::new(MockTransport::with_canned_response(
+        empty_response.to_string(),
+    ));
     let client = CodexClient::new_with_mock(creds, mock_transport);
 
     let result = client.generate_text("Test").await;
     assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("No content"));
+    assert!(result.unwrap_err().to_string().contains("No content"));
 }
 
 // Test 12: No credentials error
@@ -367,8 +369,9 @@ async fn test_response_with_null_content() {
         }]
     }"#;
 
-    let mock_transport =
-        Arc::new(MockTransport::with_canned_response(null_content_response.to_string()));
+    let mock_transport = Arc::new(MockTransport::with_canned_response(
+        null_content_response.to_string(),
+    ));
     let client = CodexClient::new_with_mock(creds, mock_transport);
 
     let result = client.generate_text("Test").await;

@@ -220,10 +220,11 @@ impl DisagreementAnalyzer {
         let agent_count = agent_ids.len();
 
         for (key, reporters) in &issue_map {
-            let reporter_ids: HashSet<&str> = reporters.iter().map(|(r, _)| r.agent_id.as_str()).collect();
+            let reporter_ids: HashSet<&str> =
+                reporters.iter().map(|(r, _)| r.agent_id.as_str()).collect();
 
             // If less than half the agents report this issue, it might be a disagreement
-            if reporter_ids.len() < (agent_count + 1) / 2 && reporter_ids.len() < agent_count {
+            if reporter_ids.len() < agent_count.div_ceil(2) && reporter_ids.len() < agent_count {
                 let non_reporters: Vec<&str> = agent_ids
                     .iter()
                     .filter(|id| !reporter_ids.contains(*id))
@@ -234,7 +235,9 @@ impl DisagreementAnalyzer {
                     let max_severity = reporters.iter().map(|(_, i)| i.severity).max();
 
                     let level = match max_severity {
-                        Some(Severity::Critical) | Some(Severity::Major) => DisagreementLevel::Moderate,
+                        Some(Severity::Critical) | Some(Severity::Major) => {
+                            DisagreementLevel::Moderate
+                        }
                         _ => DisagreementLevel::Minor,
                     };
 
@@ -288,7 +291,10 @@ impl DisagreementAnalyzer {
 
         let confidences: Vec<f64> = reviews.iter().map(|r| r.confidence).collect();
         let min_conf = confidences.iter().cloned().fold(f64::INFINITY, f64::min);
-        let max_conf = confidences.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        let max_conf = confidences
+            .iter()
+            .cloned()
+            .fold(f64::NEG_INFINITY, f64::max);
 
         // Significant disagreement if confidence varies by more than 0.3
         if (max_conf - min_conf) > 0.3 {
@@ -381,8 +387,7 @@ impl DisagreementSummary {
 
         // Recommend manual review if there are any severe disagreements
         // or more than 2 moderate ones
-        summary.requires_manual_review =
-            summary.severe_count > 0 || summary.moderate_count > 2;
+        summary.requires_manual_review = summary.severe_count > 0 || summary.moderate_count > 2;
 
         summary
     }
@@ -402,7 +407,12 @@ mod tests {
         }
     }
 
-    fn make_review(agent_id: &str, verdict: Verdict, confidence: f64, issues: Vec<Issue>) -> AgentReview {
+    fn make_review(
+        agent_id: &str,
+        verdict: Verdict,
+        confidence: f64,
+        issues: Vec<Issue>,
+    ) -> AgentReview {
         AgentReview {
             agent_id: agent_id.to_string(),
             verdict,
@@ -455,7 +465,12 @@ mod tests {
     fn test_verdict_disagreement_pass_vs_issue() {
         let reviews = vec![
             make_review("grok", Verdict::Pass, 0.9, vec![]),
-            make_review("claude", Verdict::Issue, 0.9, vec![make_issue(Severity::Minor, "test", "issue", None)]),
+            make_review(
+                "claude",
+                Verdict::Issue,
+                0.9,
+                vec![make_issue(Severity::Minor, "test", "issue", None)],
+            ),
         ];
         let disagreements = DisagreementAnalyzer::find_disagreements(&reviews);
         let verdict_d: Vec<_> = disagreements
@@ -469,12 +484,28 @@ mod tests {
     #[test]
     fn test_severity_disagreement_same_issue() {
         let reviews = vec![
-            make_review("grok", Verdict::Issue, 0.9, vec![
-                make_issue(Severity::Minor, "security", "SQL injection", Some("db.rs:42"))
-            ]),
-            make_review("claude", Verdict::Issue, 0.9, vec![
-                make_issue(Severity::Critical, "security", "SQL injection", Some("db.rs:42"))
-            ]),
+            make_review(
+                "grok",
+                Verdict::Issue,
+                0.9,
+                vec![make_issue(
+                    Severity::Minor,
+                    "security",
+                    "SQL injection",
+                    Some("db.rs:42"),
+                )],
+            ),
+            make_review(
+                "claude",
+                Verdict::Issue,
+                0.9,
+                vec![make_issue(
+                    Severity::Critical,
+                    "security",
+                    "SQL injection",
+                    Some("db.rs:42"),
+                )],
+            ),
         ];
         let disagreements = DisagreementAnalyzer::find_disagreements(&reviews);
         let issue_d: Vec<_> = disagreements
@@ -489,9 +520,17 @@ mod tests {
     fn test_issue_detection_disagreement() {
         let reviews = vec![
             make_review("grok", Verdict::Pass, 0.9, vec![]),
-            make_review("claude", Verdict::Issue, 0.9, vec![
-                make_issue(Severity::Minor, "performance", "Slow loop", Some("engine.rs:100"))
-            ]),
+            make_review(
+                "claude",
+                Verdict::Issue,
+                0.9,
+                vec![make_issue(
+                    Severity::Minor,
+                    "performance",
+                    "Slow loop",
+                    Some("engine.rs:100"),
+                )],
+            ),
             make_review("gemini", Verdict::Pass, 0.85, vec![]),
         ];
         let disagreements = DisagreementAnalyzer::find_disagreements(&reviews);
@@ -554,7 +593,10 @@ mod tests {
             location: None,
             summary: "test".to_string(),
         };
-        assert_eq!(DisagreementAnalyzer::classify(&disagreement), DisagreementLevel::Moderate);
+        assert_eq!(
+            DisagreementAnalyzer::classify(&disagreement),
+            DisagreementLevel::Moderate
+        );
     }
 
     #[test]
@@ -566,15 +608,13 @@ mod tests {
 
     #[test]
     fn test_disagreement_summary_with_severe() {
-        let disagreements = vec![
-            Disagreement {
-                topic: "test".to_string(),
-                positions: vec![],
-                level: DisagreementLevel::Severe,
-                location: None,
-                summary: "test".to_string(),
-            },
-        ];
+        let disagreements = vec![Disagreement {
+            topic: "test".to_string(),
+            positions: vec![],
+            level: DisagreementLevel::Severe,
+            location: None,
+            summary: "test".to_string(),
+        }];
         let summary = DisagreementSummary::from_disagreements(&disagreements);
         assert_eq!(summary.total, 1);
         assert_eq!(summary.severe_count, 1);
@@ -614,15 +654,13 @@ mod tests {
 
     #[test]
     fn test_disagreement_summary_minor_only() {
-        let disagreements = vec![
-            Disagreement {
-                topic: "test".to_string(),
-                positions: vec![],
-                level: DisagreementLevel::Minor,
-                location: None,
-                summary: "test".to_string(),
-            },
-        ];
+        let disagreements = vec![Disagreement {
+            topic: "test".to_string(),
+            positions: vec![],
+            level: DisagreementLevel::Minor,
+            location: None,
+            summary: "test".to_string(),
+        }];
         let summary = DisagreementSummary::from_disagreements(&disagreements);
         assert_eq!(summary.total, 1);
         assert_eq!(summary.minor_count, 1);

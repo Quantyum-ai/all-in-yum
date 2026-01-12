@@ -6,6 +6,10 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 
+[features]
+default = []
+http = ["dep:reqwest"]
+
 [dependencies]
 # Workspace dependencies
 aiy-core = { path = "../aiy-core" }
@@ -16,6 +20,8 @@ serde_json.workspace = true
 thiserror.workspace = true
 async-trait.workspace = true
 
+# Optional HTTP transport
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"], optional = true }
+
 [dev-dependencies]
 tempfile.workspace = true
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }

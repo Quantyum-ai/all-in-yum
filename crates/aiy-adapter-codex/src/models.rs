@@ -5,9 +5,10 @@
 use serde::{Deserialize, Serialize};
 
 /// OpenAI model identifiers
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum CodexModel {
     /// GPT-4o - Latest flagship model (default)
+    #[default]
     #[serde(rename = "gpt-4o")]
     Gpt4o,
     /// GPT-4o Mini - Smaller, faster, cheaper
@@ -54,10 +55,7 @@ impl CodexModel {
 
     /// Whether the model supports function calling
     pub fn supports_function_calling(&self) -> bool {
-        match self {
-            CodexModel::O1 | CodexModel::O1Mini => false,
-            _ => true,
-        }
+        !matches!(self, CodexModel::O1 | CodexModel::O1Mini)
     }
 
     /// Whether the model supports streaming
@@ -95,12 +93,6 @@ impl CodexModel {
             CodexModel::O1 => 60.00,
             CodexModel::O1Mini => 12.00,
         }
-    }
-}
-
-impl Default for CodexModel {
-    fn default() -> Self {
-        CodexModel::Gpt4o
     }
 }
 

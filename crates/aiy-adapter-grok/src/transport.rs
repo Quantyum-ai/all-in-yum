@@ -8,13 +8,19 @@
 use crate::error::GrokError;
 use async_trait::async_trait;
 use std::sync::atomic::{AtomicUsize, Ordering};
+#[cfg(feature = "http")]
 use std::time::Duration;
 
 /// HTTP transport trait for making API requests
 #[async_trait]
 pub trait HttpTransport: Send + Sync {
     /// Send a POST request with JSON body
-    async fn post_json(&self, url: &str, headers: &[(&str, &str)], body: &str) -> Result<String, GrokError>;
+    async fn post_json(
+        &self,
+        url: &str,
+        headers: &[(&str, &str)],
+        body: &str,
+    ) -> Result<String, GrokError>;
 }
 
 /// Mock transport for testing (Stage A)
@@ -59,9 +65,16 @@ impl Default for MockTransport {
 
 #[async_trait]
 impl HttpTransport for MockTransport {
-    async fn post_json(&self, _url: &str, _headers: &[(&str, &str)], _body: &str) -> Result<String, GrokError> {
+    async fn post_json(
+        &self,
+        _url: &str,
+        _headers: &[(&str, &str)],
+        _body: &str,
+    ) -> Result<String, GrokError> {
         if self.responses.is_empty() {
-            return Err(GrokError::Transport("No mock responses configured".to_string()));
+            return Err(GrokError::Transport(
+                "No mock responses configured".to_string(),
+            ));
         }
         let index = self.current_index.fetch_add(1, Ordering::SeqCst);
         let response = &self.responses[index % self.responses.len()];
@@ -97,8 +110,15 @@ impl ReqwestTransport {
 #[cfg(feature = "http")]
 #[async_trait]
 impl HttpTransport for ReqwestTransport {
-    async fn post_json(&self, url: &str, headers: &[(&str, &str)], body: &str) -> Result<String, GrokError> {
-        let mut request = self.client.post(url)
+    async fn post_json(
+        &self,
+        url: &str,
+        headers: &[(&str, &str)],
+        body: &str,
+    ) -> Result<String, GrokError> {
+        let mut request = self
+            .client
+            .post(url)
             .body(body.to_string())
             .header("Content-Type", "application/json");
 
@@ -108,10 +128,15 @@ impl HttpTransport for ReqwestTransport {
 
         // Retry logic with exponential backoff
         let mut last_error = None;
-        let delays = [Duration::from_secs(1), Duration::from_secs(2), Duration::from_secs(4)];
+        let delays = [
+            Duration::from_secs(1),
+            Duration::from_secs(2),
+            Duration::from_secs(4),
+        ];
 
         for (attempt, delay) in delays.iter().enumerate() {
-            let result = request.try_clone()
+            let result = request
+                .try_clone()
                 .ok_or_else(|| GrokError::Transport("Failed to clone request".to_string()))?
                 .send()
                 .await;
@@ -124,7 +149,8 @@ impl HttpTransport for ReqwestTransport {
                     if status.is_server_error() || status.as_u16() == 429 {
                         if attempt < delays.len() - 1 {
                             tokio::time::sleep(*delay).await;
-                            last_error = Some(GrokError::Transport(format!("Server returned {}", status)));
+                            last_error =
+                                Some(GrokError::Transport(format!("Server returned {}", status)));
                             continue;
                         }
                     }
@@ -133,7 +159,9 @@ impl HttpTransport for ReqwestTransport {
                         return Err(GrokError::ApiRequest(format!("HTTP {}", status)));
                     }
 
-                    return response.text().await
+                    return response
+                        .text()
+                        .await
                         .map_err(|e| GrokError::Transport(sanitize_error_message(&e.to_string())));
                 }
                 Err(e) => {
@@ -151,6 +179,7 @@ impl HttpTransport for ReqwestTransport {
 }
 
 /// Sanitize error messages to prevent API key leakage
+#[cfg(any(test, feature = "http"))]
 fn sanitize_error_message(msg: &str) -> String {
     // Remove anything that looks like an API key
     let sanitized = regex::Regex::new(r"(xai-[a-zA-Z0-9]{20,}|Bearer [a-zA-Z0-9\-_]+)")

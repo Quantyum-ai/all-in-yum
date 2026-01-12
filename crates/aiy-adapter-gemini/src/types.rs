@@ -58,7 +58,7 @@ impl Content {
 }
 
 /// Generation configuration for Gemini requests
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct GenerationConfig {
     /// Temperature for sampling (0.0 to 2.0)
@@ -76,18 +76,6 @@ pub struct GenerationConfig {
     /// Stop sequences
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stop_sequences: Option<Vec<String>>,
-}
-
-impl Default for GenerationConfig {
-    fn default() -> Self {
-        Self {
-            temperature: None,
-            top_p: None,
-            top_k: None,
-            max_output_tokens: None,
-            stop_sequences: None,
-        }
-    }
 }
 
 impl GenerationConfig {
@@ -238,12 +226,11 @@ mod tests {
 
     #[test]
     fn test_request_builder() {
-        let req = GeminiRequest::new("Test prompt")
-            .with_generation_config(
-                GenerationConfig::new()
-                    .with_temperature(0.7)
-                    .with_max_output_tokens(1000)
-            );
+        let req = GeminiRequest::new("Test prompt").with_generation_config(
+            GenerationConfig::new()
+                .with_temperature(0.7)
+                .with_max_output_tokens(1000),
+        );
 
         let json = serde_json::to_string(&req).unwrap();
         assert!(json.contains("\"temperature\":0.7"));
@@ -287,8 +274,7 @@ mod tests {
 
     #[test]
     fn test_camel_case_serialization() {
-        let config = GenerationConfig::new()
-            .with_max_output_tokens(100);
+        let config = GenerationConfig::new().with_max_output_tokens(100);
         let json = serde_json::to_string(&config).unwrap();
         // Should be camelCase, not snake_case
         assert!(json.contains("maxOutputTokens"));

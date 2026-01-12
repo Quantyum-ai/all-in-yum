@@ -18,15 +18,18 @@ struct AgentStatus {
 }
 
 /// Get all known agents with their runtime status
-fn get_agent_status(config: &PipelineConfig, manager: Option<&CredentialManager>) -> Vec<AgentStatus> {
+fn get_agent_status(
+    config: &PipelineConfig,
+    manager: Option<&CredentialManager>,
+) -> Vec<AgentStatus> {
     AGENTS
         .iter()
         .map(|agent| {
             let enabled = config.enabled_agents.contains(&agent.id.to_string());
             let has_credentials = manager
                 .map(|m| {
-                    m.get_key(agent.credential_provider).is_ok()
-                        || m.get_key(agent.id).is_ok() // Check fallback
+                    m.get_key(agent.credential_provider).is_ok() || m.get_key(agent.id).is_ok()
+                    // Check fallback
                 })
                 .unwrap_or(false);
 
@@ -78,10 +81,7 @@ pub fn list() -> anyhow::Result<()> {
 
         println!(
             "{:12} {:25} {:10} {:12}",
-            agent.id,
-            agent.display_name,
-            status,
-            creds
+            agent.id, agent.display_name, status, creds
         );
     }
 
@@ -103,7 +103,8 @@ pub fn list() -> anyhow::Result<()> {
 /// Enable an agent
 pub fn enable(name: String) -> anyhow::Result<()> {
     let config_path = PipelineConfig::config_path()?;
-    let mut config = PipelineConfig::load(&config_path).unwrap_or_else(|_| PipelineConfig::default());
+    let mut config =
+        PipelineConfig::load(&config_path).unwrap_or_else(|_| PipelineConfig::default());
 
     // Validate agent name using registry
     let agent = registry::get_agent(&name).ok_or_else(|| {
@@ -141,7 +142,8 @@ pub fn enable(name: String) -> anyhow::Result<()> {
 /// Disable an agent
 pub fn disable(name: String) -> anyhow::Result<()> {
     let config_path = PipelineConfig::config_path()?;
-    let mut config = PipelineConfig::load(&config_path).unwrap_or_else(|_| PipelineConfig::default());
+    let mut config =
+        PipelineConfig::load(&config_path).unwrap_or_else(|_| PipelineConfig::default());
 
     // Validate agent name using registry
     if !registry::is_valid_agent(&name) {
@@ -261,9 +263,7 @@ fn get_credential_manager(config: &PipelineConfig) -> anyhow::Result<CredentialM
         .ok_or_else(|| anyhow::anyhow!("Could not determine config directory"))?;
     let cred_path = config_dir.join("all-in-yum").join("credentials.enc");
 
-    let manager = CredentialManager::new(CredentialBackend::EncryptedFile {
-        path: cred_path,
-    })?;
+    let manager = CredentialManager::new(CredentialBackend::EncryptedFile { path: cred_path })?;
 
     Ok(manager)
 }

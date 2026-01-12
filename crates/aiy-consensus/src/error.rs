@@ -107,18 +107,12 @@ mod tests {
     #[test]
     fn test_agent_failure_error() {
         let err = ConsensusError::agent_failure("grok", "Connection refused");
-        assert_eq!(
-            err.to_string(),
-            "Agent 'grok' failed: Connection refused"
-        );
+        assert_eq!(err.to_string(), "Agent 'grok' failed: Connection refused");
     }
 
     #[test]
     fn test_agent_timeout_error() {
         let err = ConsensusError::agent_timeout("claude", 30000);
-        assert_eq!(
-            err.to_string(),
-            "Agent 'claude' timed out after 30000ms"
-        );
+        assert_eq!(err.to_string(), "Agent 'claude' timed out after 30000ms");
     }
 }

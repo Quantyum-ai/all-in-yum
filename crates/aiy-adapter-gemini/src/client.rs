@@ -2,14 +2,14 @@
 
 use crate::error::GeminiError;
 use crate::models::GeminiModel;
+use crate::transport::HttpTransport;
 use crate::types::{GeminiRequest, GeminiResponse, GenerationConfig};
 use aiy_adapters::AgentReview;
-use aiy_core::security::CredentialManager;
 use aiy_core::security::sanitization::{
     build_secure_review_prompt, sanitize_artifact_content, validate_review_response,
     validate_review_schema,
 };
-use async_trait::async_trait;
+use aiy_core::security::CredentialManager;
 use serde_json::Value;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -19,75 +19,6 @@ pub const DEFAULT_BASE_URL: &str = "https://generativelanguage.googleapis.com/v1
 
 /// Default timeout in milliseconds
 pub const DEFAULT_TIMEOUT_MS: u64 = 120_000;
-
-/// Trait for HTTP transport (allows mocking in Stage A)
-#[async_trait]
-pub trait HttpTransport: Send + Sync {
-    /// Send a POST request with JSON body and return JSON response
-    /// NOTE: For Gemini, the URL will include the API key as a query parameter.
-    /// Implementations must ensure the key is never logged.
-    async fn post_json(
-        &self,
-        url: &str,
-        headers: &[(&str, &str)],
-        body: &str,
-    ) -> Result<String, GeminiError>;
-}
-
-/// Type alias for mock response function
-type ResponseFn = Box<dyn Fn(&str) -> Result<String, GeminiError> + Send + Sync>;
-
-/// Mock HTTP transport for Stage A (offline-safe)
-pub struct MockTransport {
-    /// Optional mock response provider
-    response_fn: Option<ResponseFn>,
-}
-
-impl MockTransport {
-    /// Create a new mock transport with no responses
-    pub fn new() -> Self {
-        Self { response_fn: None }
-    }
-
-    /// Create a mock transport with a custom response function
-    pub fn with_response<F>(response_fn: F) -> Self
-    where
-        F: Fn(&str) -> Result<String, GeminiError> + Send + Sync + 'static,
-    {
-        Self {
-            response_fn: Some(Box::new(response_fn)),
-        }
-    }
-
-    /// Create a mock transport that returns a canned response
-    pub fn with_canned_response(response: String) -> Self {
-        Self::with_response(move |_| Ok(response.clone()))
-    }
-}
-
-impl Default for MockTransport {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-#[async_trait]
-impl HttpTransport for MockTransport {
-    async fn post_json(
-        &self,
-        _url: &str,
-        _headers: &[(&str, &str)],
-        body: &str,
-    ) -> Result<String, GeminiError> {
-        if let Some(ref response_fn) = self.response_fn {
-            response_fn(body)
-        } else {
-            Err(GeminiError::Transport(
-                "MockTransport: No response configured".to_string(),
-            ))
-        }
-    }
-}
 
 /// Gemini API client
 pub struct GeminiClient {
@@ -169,16 +100,18 @@ impl GeminiClient {
     }
 
     /// Send a generateContent request
-    async fn generate_content(&self, request: &GeminiRequest) -> Result<GeminiResponse, GeminiError> {
+    async fn generate_content(
+        &self,
+        request: &GeminiRequest,
+    ) -> Result<GeminiResponse, GeminiError> {
         let api_key = self.get_api_key().await?;
         let url = self.build_endpoint_url(&api_key);
 
         let body = serde_json::to_string(request)?;
-        let headers = vec![
-            ("Content-Type", "application/json"),
-        ];
 
-        let response_json = self.transport.post_json(&url, &headers, &body).await?;
+        // NOTE: For Gemini, API key is in the query string, not headers.
+        // The transport handles setting Content-Type.
+        let response_json = self.transport.post_json(&url, &body).await?;
 
         serde_json::from_str::<GeminiResponse>(&response_json)
             .map_err(|e| GeminiError::ResponseParsing(e.to_string()))
@@ -232,13 +165,15 @@ impl GeminiClient {
         validate_review_schema(&response_json)?;
 
         // Step 7: Parse into AgentReview
-        serde_json::from_value(response_json).map_err(|e| GeminiError::ResponseParsing(e.to_string()))
+        serde_json::from_value(response_json)
+            .map_err(|e| GeminiError::ResponseParsing(e.to_string()))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::transport::MockTransport;
     use aiy_core::security::CredentialBackend;
     use tempfile::TempDir;
 
@@ -313,7 +248,9 @@ mod tests {
             }]
         }"#;
 
-        let mock_transport = Arc::new(MockTransport::with_canned_response(mock_response.to_string()));
+        let mock_transport = Arc::new(MockTransport::with_canned_response(
+            mock_response.to_string(),
+        ));
         let client = GeminiClient::new_with_mock(manager, mock_transport);
 
         let response = client.generate_text("Hello").await.unwrap();

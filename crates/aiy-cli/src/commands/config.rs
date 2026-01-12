@@ -33,7 +33,8 @@ pub fn show() -> anyhow::Result<()> {
 /// Set a configuration value
 pub fn set(key: String, value: String) -> anyhow::Result<()> {
     let config_path = PipelineConfig::config_path()?;
-    let mut config = PipelineConfig::load(&config_path).unwrap_or_else(|_| PipelineConfig::default());
+    let mut config =
+        PipelineConfig::load(&config_path).unwrap_or_else(|_| PipelineConfig::default());
 
     // Handle different configuration keys
     match key.as_str() {
@@ -53,7 +54,9 @@ pub fn set(key: String, value: String) -> anyhow::Result<()> {
                     registry::valid_agents_string()
                 );
             }
-            config.default_models.insert(agent.to_string(), value.clone());
+            config
+                .default_models
+                .insert(agent.to_string(), value.clone());
         }
 
         key if key.starts_with("base_urls.") => {
@@ -122,10 +125,7 @@ pub fn reset() -> anyhow::Result<()> {
     let config = PipelineConfig::default();
     config.save(&config_path)?;
 
-    println!(
-        "{} Configuration reset to defaults",
-        "[OK]".green()
-    );
+    println!("{} Configuration reset to defaults", "[OK]".green());
     println!(
         "{}: {}",
         "File".dimmed(),

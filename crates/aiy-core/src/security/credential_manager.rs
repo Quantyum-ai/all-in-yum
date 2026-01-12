@@ -1165,10 +1165,8 @@ mod tests {
         assert!(!salt_path.exists());
 
         // Create manager and unlock (this creates the salt file)
-        let mut manager = CredentialManager::new(CredentialBackend::EncryptedFile {
-            path: cred_path,
-        })
-        .unwrap();
+        let mut manager =
+            CredentialManager::new(CredentialBackend::EncryptedFile { path: cred_path }).unwrap();
         manager.unlock("test-password").unwrap();
 
         // Salt file should now exist with 0600 permissions
@@ -1226,10 +1224,7 @@ mod tests {
 
         fn get_password(&self) -> KeyringResult<String> {
             let store = self.store.lock().expect("in-memory keyring store poisoned");
-            store
-                .get(&self.key)
-                .cloned()
-                .ok_or(KeyringError::NoEntry)
+            store.get(&self.key).cloned().ok_or(KeyringError::NoEntry)
         }
 
         fn delete_password(&self) -> KeyringResult<()> {

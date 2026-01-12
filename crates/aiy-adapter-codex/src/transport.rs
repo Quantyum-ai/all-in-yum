@@ -5,6 +5,11 @@
 use crate::error::CodexError;
 use async_trait::async_trait;
 use std::sync::Mutex;
+#[cfg(feature = "http")]
+use std::time::Duration;
+
+/// Type alias for mock response generator functions
+type MockResponseFn = Box<dyn Fn(&str) -> Result<String, CodexError> + Send + Sync>;
 
 /// HTTP transport trait for making API requests
 #[async_trait]
@@ -31,7 +36,7 @@ pub struct MockTransport {
     /// Canned response to return
     response: Mutex<Option<String>>,
     /// Response generator function
-    response_fn: Option<Box<dyn Fn(&str) -> Result<String, CodexError> + Send + Sync>>,
+    response_fn: Option<MockResponseFn>,
 }
 
 impl MockTransport {
@@ -113,6 +118,45 @@ impl ReqwestTransport {
 }
 
 #[cfg(feature = "http")]
+impl ReqwestTransport {
+    /// Execute a single HTTP request without retries
+    async fn execute_request(
+        &self,
+        url: &str,
+        headers: &[(&str, &str)],
+        body: &str,
+    ) -> Result<String, CodexError> {
+        let mut req = self.client.post(url).body(body.to_string());
+        for (key, value) in headers {
+            req = req.header(*key, *value);
+        }
+
+        let response = req
+            .send()
+            .await
+            .map_err(|e| CodexError::Transport(sanitize_error_message(&e.to_string())))?;
+
+        let status = response.status();
+
+        // Classify errors for retry logic
+        if status.as_u16() == 429 {
+            return Err(CodexError::RateLimit("Rate limit exceeded".to_string()));
+        }
+        if status.is_server_error() {
+            return Err(CodexError::Transport(format!("Server error: {}", status)));
+        }
+        if !status.is_success() {
+            return Err(CodexError::ApiRequest(format!("HTTP {}", status)));
+        }
+
+        response
+            .text()
+            .await
+            .map_err(|e| CodexError::Transport(sanitize_error_message(&e.to_string())))
+    }
+}
+
+#[cfg(feature = "http")]
 #[async_trait]
 impl HttpTransport for ReqwestTransport {
     async fn post_json(
@@ -121,31 +165,37 @@ impl HttpTransport for ReqwestTransport {
         headers: &[(&str, &str)],
         body: &str,
     ) -> Result<String, CodexError> {
-        let mut request = self.client.post(url).body(body.to_string());
+        // Retry logic with exponential backoff
+        let delays = [
+            Duration::from_secs(1),
+            Duration::from_secs(2),
+            Duration::from_secs(4),
+        ];
+        let max_retries = delays.len();
 
-        for (key, value) in headers {
-            request = request.header(*key, *value);
+        for attempt in 0..=max_retries {
+            match self.execute_request(url, headers, body).await {
+                Ok(text) => return Ok(text),
+                Err(e) if attempt < max_retries && e.is_retryable() => {
+                    tokio::time::sleep(delays[attempt]).await;
+                    continue;
+                }
+                Err(e) => return Err(e),
+            }
         }
 
-        let response = request
-            .send()
-            .await
-            .map_err(|e| CodexError::Transport(e.to_string()))?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            return Err(CodexError::ApiRequest(format!(
-                "HTTP {} - {}",
-                status, body
-            )));
-        }
-
-        response
-            .text()
-            .await
-            .map_err(|e| CodexError::Transport(e.to_string()))
+        unreachable!()
     }
+}
+
+/// Sanitize error messages to prevent API key leakage
+#[cfg(any(test, feature = "http"))]
+fn sanitize_error_message(msg: &str) -> String {
+    // Remove anything that looks like an API key (OpenAI style for Codex)
+    let sanitized = regex::Regex::new(r"(sk-[a-zA-Z0-9\-]+|Bearer [a-zA-Z0-9\-_]+)")
+        .unwrap()
+        .replace_all(msg, "[REDACTED]");
+    sanitized.to_string()
 }
 
 #[cfg(test)]
@@ -171,13 +221,49 @@ mod tests {
 
     #[tokio::test]
     async fn test_mock_transport_with_function() {
-        let transport = MockTransport::with_response(|body| {
-            Ok(format!("received: {}", body))
-        });
+        let transport = MockTransport::with_response(|body| Ok(format!("received: {}", body)));
         let result = transport
             .post_json("http://test", &[], "hello")
             .await
             .unwrap();
         assert_eq!(result, "received: hello");
+    }
+
+    #[test]
+    fn test_rate_limit_is_retryable() {
+        let err = CodexError::RateLimit("Rate limit exceeded".to_string());
+        assert!(err.is_retryable());
+    }
+
+    #[test]
+    fn test_timeout_is_retryable() {
+        let err = CodexError::Timeout("Request timed out".to_string());
+        assert!(err.is_retryable());
+    }
+
+    #[test]
+    fn test_transport_is_retryable() {
+        let err = CodexError::Transport("Connection reset".to_string());
+        assert!(err.is_retryable());
+    }
+
+    #[test]
+    fn test_auth_error_not_retryable() {
+        let err = CodexError::Credential("Invalid API key".to_string());
+        assert!(!err.is_retryable());
+    }
+
+    #[test]
+    fn test_api_request_not_retryable() {
+        let err = CodexError::ApiRequest("HTTP 400".to_string());
+        assert!(!err.is_retryable());
+    }
+
+    #[test]
+    fn test_sanitize_error_removes_api_key() {
+        let msg = "Error with key sk-abcdefghij12345 in request";
+        let sanitized = sanitize_error_message(msg);
+        assert!(!sanitized.contains("sk-"));
+        assert!(sanitized.contains("[REDACTED]"));
     }
 }

@@ -5,10 +5,11 @@
 use serde::{Deserialize, Serialize};
 
 /// Gemini model identifiers
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "kebab-case")]
 pub enum GeminiModel {
     /// Gemini 1.5 Pro - Latest version, best for complex tasks
+    #[default]
     Gemini15Pro,
     /// Gemini 1.5 Flash - Faster, optimized for speed
     Gemini15Flash,
@@ -32,10 +33,10 @@ impl GeminiModel {
     /// Get the context window size in tokens
     pub fn context_window(&self) -> usize {
         match self {
-            GeminiModel::Gemini15Pro => 2_097_152, // 2M tokens
-            GeminiModel::Gemini15Flash => 1_048_576, // 1M tokens
+            GeminiModel::Gemini15Pro => 2_097_152,      // 2M tokens
+            GeminiModel::Gemini15Flash => 1_048_576,    // 1M tokens
             GeminiModel::Gemini20FlashExp => 1_048_576, // 1M tokens
-            GeminiModel::Gemini15Flash8B => 1_048_576, // 1M tokens
+            GeminiModel::Gemini15Flash8B => 1_048_576,  // 1M tokens
         }
     }
 
@@ -76,12 +77,6 @@ impl GeminiModel {
     }
 }
 
-impl Default for GeminiModel {
-    fn default() -> Self {
-        GeminiModel::Gemini15Pro
-    }
-}
-
 impl std::fmt::Display for GeminiModel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.as_str())
@@ -95,9 +90,18 @@ mod tests {
     #[test]
     fn test_model_strings() {
         assert_eq!(GeminiModel::Gemini15Pro.as_str(), "gemini-1.5-pro-latest");
-        assert_eq!(GeminiModel::Gemini15Flash.as_str(), "gemini-1.5-flash-latest");
-        assert_eq!(GeminiModel::Gemini20FlashExp.as_str(), "gemini-2.0-flash-exp");
-        assert_eq!(GeminiModel::Gemini15Flash8B.as_str(), "gemini-1.5-flash-8b-latest");
+        assert_eq!(
+            GeminiModel::Gemini15Flash.as_str(),
+            "gemini-1.5-flash-latest"
+        );
+        assert_eq!(
+            GeminiModel::Gemini20FlashExp.as_str(),
+            "gemini-2.0-flash-exp"
+        );
+        assert_eq!(
+            GeminiModel::Gemini15Flash8B.as_str(),
+            "gemini-1.5-flash-8b-latest"
+        );
     }
 
     #[test]
@@ -136,7 +140,13 @@ mod tests {
 
     #[test]
     fn test_display() {
-        assert_eq!(format!("{}", GeminiModel::Gemini15Pro), "gemini-1.5-pro-latest");
-        assert_eq!(format!("{}", GeminiModel::Gemini20FlashExp), "gemini-2.0-flash-exp");
+        assert_eq!(
+            format!("{}", GeminiModel::Gemini15Pro),
+            "gemini-1.5-pro-latest"
+        );
+        assert_eq!(
+            format!("{}", GeminiModel::Gemini20FlashExp),
+            "gemini-2.0-flash-exp"
+        );
     }
 }

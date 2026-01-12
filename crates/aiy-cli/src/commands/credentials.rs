@@ -168,13 +168,7 @@ mod tests {
     #[test]
     fn test_redact_api_key() {
         assert_eq!(redact_api_key("short"), "[REDACTED]");
-        assert_eq!(
-            redact_api_key("sk-1234567890abcdefghij"),
-            "sk-1...ghij"
-        );
-        assert_eq!(
-            redact_api_key("very-long-api-key-value"),
-            "very...alue"
-        );
+        assert_eq!(redact_api_key("sk-1234567890abcdefghij"), "sk-1...ghij");
+        assert_eq!(redact_api_key("very-long-api-key-value"), "very...alue");
     }
 }

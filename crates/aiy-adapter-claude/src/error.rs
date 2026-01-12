@@ -60,6 +60,17 @@ impl From<aiy_core::security::sanitization::SanitizationError> for ClaudeError {
 }
 
 impl ClaudeError {
+    /// Check if this error is retryable.
+    ///
+    /// Returns true for transient errors like rate limits, timeouts, and transport errors.
+    /// Returns false for permanent errors like auth failures or parsing errors.
+    pub fn is_retryable(&self) -> bool {
+        matches!(
+            self,
+            Self::RateLimit(_) | Self::Timeout(_) | Self::Transport(_)
+        )
+    }
+
     /// Get the error kind for this error.
     ///
     /// Maps internal error variants to the standardized `AdapterErrorKind`.

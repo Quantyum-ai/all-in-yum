@@ -1,3 +1,34 @@
+//! Core trait definitions and shared types for agent adapters.
+//!
+//! This module defines the [`AgentAdapter`] trait that all AI backend adapters
+//! must implement, along with the common types used for code review operations:
+//!
+//! - [`AgentReview`]: Structured feedback from an agent's code review
+//! - [`Verdict`]: Pass/Issue/Block classification of code
+//! - [`Issue`]: Individual problem identified during review
+//! - [`Severity`]: Critical/Major/Minor/Nit classification of issues
+//! - [`AdapterError`]: Unified error type with classification for retry logic
+//! - [`RetryConfig`]: Configuration for handling transient errors
+//!
+//! # Example
+//!
+//! ```ignore
+//! use aiy_adapters::{AgentAdapter, AgentReview, AdapterError};
+//! use async_trait::async_trait;
+//!
+//! struct MyAdapter;
+//!
+//! #[async_trait]
+//! impl AgentAdapter for MyAdapter {
+//!     fn id(&self) -> &str { "my-adapter" }
+//!     fn display_name(&self) -> &str { "My Adapter" }
+//!     async fn review_artifact(&self, artifact: &str) -> Result<AgentReview, AdapterError> {
+//!         // Implementation here
+//!         todo!()
+//!     }
+//! }
+//! ```
+
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -83,7 +114,11 @@ impl AdapterError {
     }
 
     /// Create a new adapter error with custom retryability.
-    pub fn with_retryable(kind: AdapterErrorKind, message: impl Into<String>, retryable: bool) -> Self {
+    pub fn with_retryable(
+        kind: AdapterErrorKind,
+        message: impl Into<String>,
+        retryable: bool,
+    ) -> Self {
         Self {
             kind,
             message: message.into(),
@@ -179,6 +214,25 @@ impl Default for RetryConfig {
             max_delay_ms: 30000,
             backoff_multiplier: 2.0,
         }
+    }
+}
+
+impl RetryConfig {
+    /// Create config with custom max retries, using defaults for other fields.
+    pub fn with_max_retries(max_retries: u32) -> Self {
+        Self {
+            max_retries,
+            ..Default::default()
+        }
+    }
+
+    /// Calculate delay for given attempt number (0-indexed).
+    ///
+    /// The delay is capped at `max_delay_ms` to prevent unbounded backoff.
+    pub fn calculate_delay(&self, attempt: u32) -> std::time::Duration {
+        let delay_ms = self.initial_delay_ms as f64 * self.backoff_multiplier.powi(attempt as i32);
+        let capped_ms = delay_ms.min(self.max_delay_ms as f64) as u64;
+        std::time::Duration::from_millis(capped_ms)
     }
 }
 
@@ -463,7 +517,8 @@ mod tests {
         assert!(err.is_retryable());
 
         // Network errors are normally retryable, but can be overridden
-        let err = AdapterError::with_retryable(AdapterErrorKind::Network, "Fatal network error", false);
+        let err =
+            AdapterError::with_retryable(AdapterErrorKind::Network, "Fatal network error", false);
         assert_eq!(err.kind(), AdapterErrorKind::Network);
         assert!(!err.is_retryable());
     }
@@ -484,8 +539,14 @@ mod tests {
 
     #[test]
     fn test_error_kind_display() {
-        assert_eq!(format!("{}", AdapterErrorKind::Auth), "authentication error");
-        assert_eq!(format!("{}", AdapterErrorKind::RateLimit), "rate limit exceeded");
+        assert_eq!(
+            format!("{}", AdapterErrorKind::Auth),
+            "authentication error"
+        );
+        assert_eq!(
+            format!("{}", AdapterErrorKind::RateLimit),
+            "rate limit exceeded"
+        );
         assert_eq!(format!("{}", AdapterErrorKind::Network), "network error");
         assert_eq!(format!("{}", AdapterErrorKind::Timeout), "timeout");
         assert_eq!(format!("{}", AdapterErrorKind::Parse), "parse error");
@@ -522,5 +583,65 @@ mod tests {
         let err = AdapterError::network("Connection failed");
         let std_err: &dyn std::error::Error = &err;
         assert!(std_err.to_string().contains("Connection failed"));
+    }
+
+    // ==========================================================================
+    // RetryConfig tests
+    // ==========================================================================
+
+    #[test]
+    fn test_retry_config_default() {
+        let config = RetryConfig::default();
+        assert_eq!(config.max_retries, 3);
+        assert_eq!(config.initial_delay_ms, 1000);
+        assert_eq!(config.max_delay_ms, 30000);
+        assert_eq!(config.backoff_multiplier, 2.0);
+    }
+
+    #[test]
+    fn test_retry_config_with_max_retries() {
+        let config = RetryConfig::with_max_retries(5);
+        assert_eq!(config.max_retries, 5);
+        // Other fields should have defaults
+        assert_eq!(config.initial_delay_ms, 1000);
+        assert_eq!(config.max_delay_ms, 30000);
+        assert_eq!(config.backoff_multiplier, 2.0);
+    }
+
+    #[test]
+    fn test_retry_config_calculate_delay_exponential() {
+        let config = RetryConfig::default();
+        assert_eq!(
+            config.calculate_delay(0),
+            std::time::Duration::from_millis(1000)
+        );
+        assert_eq!(
+            config.calculate_delay(1),
+            std::time::Duration::from_millis(2000)
+        );
+        assert_eq!(
+            config.calculate_delay(2),
+            std::time::Duration::from_millis(4000)
+        );
+    }
+
+    #[test]
+    fn test_retry_config_calculate_delay_respects_max_cap() {
+        let config = RetryConfig {
+            max_retries: 10,
+            initial_delay_ms: 1000,
+            max_delay_ms: 5000, // 5 second cap
+            backoff_multiplier: 2.0,
+        };
+        // Attempt 3: 1000 * 2^3 = 8000ms, but capped at 5000ms
+        assert_eq!(
+            config.calculate_delay(3),
+            std::time::Duration::from_millis(5000)
+        );
+        // Attempt 4: 1000 * 2^4 = 16000ms, still capped at 5000ms
+        assert_eq!(
+            config.calculate_delay(4),
+            std::time::Duration::from_millis(5000)
+        );
     }
 }

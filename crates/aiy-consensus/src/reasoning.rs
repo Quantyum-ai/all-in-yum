@@ -123,12 +123,18 @@ impl ReasoningGenerator {
             Verdict::Block => "BLOCK",
         };
 
-        let pass_count = reviews.iter().filter(|r| r.verdict == Verdict::Pass).count();
+        let pass_count = reviews
+            .iter()
+            .filter(|r| r.verdict == Verdict::Pass)
+            .count();
         let total = reviews.len();
 
         format!(
             "Consensus Verdict: {} ({}/{} approve, {:.0}% average confidence)",
-            verdict_str, pass_count, total, avg_confidence * 100.0
+            verdict_str,
+            pass_count,
+            total,
+            avg_confidence * 100.0
         )
     }
 
@@ -203,7 +209,10 @@ impl ReasoningGenerator {
         }
 
         if disagreements.len() > 5 {
-            lines.push(format!("  ... and {} more disagreements", disagreements.len() - 5));
+            lines.push(format!(
+                "  ... and {} more disagreements",
+                disagreements.len() - 5
+            ));
         }
 
         if summary.requires_manual_review {
@@ -226,7 +235,8 @@ impl ReasoningGenerator {
         match final_verdict {
             Verdict::Pass => {
                 if disagreements.is_empty() {
-                    recommendations.push("- All agents agree. Code is ready for merge.".to_string());
+                    recommendations
+                        .push("- All agents agree. Code is ready for merge.".to_string());
                 } else {
                     recommendations.push(
                         "- Majority approve, but review flagged disagreements before merging."
@@ -239,7 +249,8 @@ impl ReasoningGenerator {
                     .push("- Address the reported issues before proceeding.".to_string());
 
                 // Summarize issue categories
-                let mut categories: std::collections::HashSet<String> = std::collections::HashSet::new();
+                let mut categories: std::collections::HashSet<String> =
+                    std::collections::HashSet::new();
                 for review in reviews {
                     for issue in &review.issues {
                         categories.insert(issue.category.clone());
@@ -253,11 +264,14 @@ impl ReasoningGenerator {
                 }
             }
             Verdict::Block => {
-                recommendations.push("- DO NOT MERGE. Critical issues require resolution.".to_string());
+                recommendations
+                    .push("- DO NOT MERGE. Critical issues require resolution.".to_string());
 
                 // Find blocking agents and their reasons
-                let blockers: Vec<&AgentReview> =
-                    reviews.iter().filter(|r| r.verdict == Verdict::Block).collect();
+                let blockers: Vec<&AgentReview> = reviews
+                    .iter()
+                    .filter(|r| r.verdict == Verdict::Block)
+                    .collect();
                 for blocker in blockers {
                     if !blocker.reasoning.is_empty() {
                         let snippet = Self::extract_reasoning_snippet(&blocker.reasoning);
@@ -312,6 +326,17 @@ impl ReasoningGenerator {
 }
 
 /// Format aggregated issues into a human-readable summary.
+///
+/// Creates a numbered list of issues with severity, description, location,
+/// and the agents that reported each issue.
+///
+/// # Arguments
+///
+/// * `issues` - Slice of aggregated issues to format
+///
+/// # Returns
+///
+/// A formatted multi-line string. Returns "No issues found." if empty.
 pub fn format_aggregated_issues(issues: &[AggregatedIssue]) -> String {
     if issues.is_empty() {
         return "No issues found.".to_string();
@@ -344,6 +369,16 @@ pub fn format_aggregated_issues(issues: &[AggregatedIssue]) -> String {
 }
 
 /// Format a verdict for display.
+///
+/// Converts a verdict enum to a human-readable status string.
+///
+/// # Arguments
+///
+/// * `verdict` - The verdict to format
+///
+/// # Returns
+///
+/// A static string describing the verdict status.
 pub fn format_verdict(verdict: Verdict) -> &'static str {
     match verdict {
         Verdict::Pass => "PASS - Approved",
@@ -353,6 +388,16 @@ pub fn format_verdict(verdict: Verdict) -> &'static str {
 }
 
 /// Format confidence as a percentage string.
+///
+/// Converts a confidence value (0.0 to 1.0) to a percentage string.
+///
+/// # Arguments
+///
+/// * `confidence` - Confidence value between 0.0 and 1.0
+///
+/// # Returns
+///
+/// A string like "95%" representing the confidence as a percentage.
 pub fn format_confidence(confidence: f64) -> String {
     format!("{:.0}%", confidence * 100.0)
 }
@@ -399,7 +444,14 @@ mod tests {
 
     #[test]
     fn test_generate_single_passing_review() {
-        let reviews = vec![make_review("grok", Verdict::Pass, 0.95, vec![], vec![], "Code looks good.")];
+        let reviews = vec![make_review(
+            "grok",
+            Verdict::Pass,
+            0.95,
+            vec![],
+            vec![],
+            "Code looks good.",
+        )];
         let result = ReasoningGenerator::generate(&reviews, Verdict::Pass, &[]);
 
         assert!(result.contains("PASS"));
@@ -412,7 +464,14 @@ mod tests {
     fn test_generate_with_disagreements() {
         let reviews = vec![
             make_review("grok", Verdict::Pass, 0.9, vec![], vec![], "Looks fine."),
-            make_review("claude", Verdict::Block, 0.9, vec![], vec![], "Security issue found."),
+            make_review(
+                "claude",
+                Verdict::Block,
+                0.9,
+                vec![],
+                vec![],
+                "Security issue found.",
+            ),
         ];
 
         let disagreements = vec![Disagreement {

@@ -1,4 +1,14 @@
 //! Core types for the consensus engine.
+//!
+//! This module defines the primary data structures used throughout the
+//! consensus pipeline:
+//!
+//! - [`ConsensusResult`]: The final output of a consensus operation
+//! - [`AgentOutcome`]: Result of a single agent's review attempt
+//!
+//! These types are designed to capture the complete state of a multi-agent
+//! review process, including successful reviews, failures, timeouts, and
+//! the aggregated consensus decision.
 
 use aiy_adapters::{AgentReview, Issue, Verdict};
 use serde::{Deserialize, Serialize};
@@ -38,11 +48,7 @@ impl ConsensusResult {
     ///
     /// A fully populated `ConsensusResult` with calculated confidence,
     /// dissenting agents, and aggregated issues.
-    pub fn new(
-        final_verdict: Verdict,
-        agent_reviews: Vec<AgentReview>,
-        reasoning: String,
-    ) -> Self {
+    pub fn new(final_verdict: Verdict, agent_reviews: Vec<AgentReview>, reasoning: String) -> Self {
         let consensus_confidence = Self::calculate_confidence(&agent_reviews);
         let dissenting_agents = Self::find_dissenting_agents(&agent_reviews, final_verdict);
         let aggregated_issues = Self::aggregate_issues(&agent_reviews);
@@ -77,10 +83,7 @@ impl ConsensusResult {
 
     /// Aggregate all issues from all agent reviews.
     fn aggregate_issues(reviews: &[AgentReview]) -> Vec<Issue> {
-        reviews
-            .iter()
-            .flat_map(|r| r.issues.clone())
-            .collect()
+        reviews.iter().flat_map(|r| r.issues.clone()).collect()
     }
 
     /// Check if consensus was unanimous (no dissenting agents).
@@ -236,11 +239,8 @@ mod tests {
             create_test_review("claude", Verdict::Pass, 0.85),
         ];
 
-        let result = ConsensusResult::new(
-            Verdict::Pass,
-            reviews,
-            "All agents approved".to_string(),
-        );
+        let result =
+            ConsensusResult::new(Verdict::Pass, reviews, "All agents approved".to_string());
 
         assert_eq!(result.final_verdict, Verdict::Pass);
         assert_eq!(result.agent_reviews.len(), 2);

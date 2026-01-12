@@ -3,13 +3,13 @@
 use crate::error::ClaudeError;
 use crate::models::ClaudeModel;
 use crate::transport::HttpTransport;
-use crate::types::{ContentBlock, Message, MessageContent, MessageRole, MessagesRequest, MessagesResponse};
+use crate::types::{Message, MessageContent, MessageRole, MessagesRequest, MessagesResponse};
 use aiy_adapters::AgentReview;
-use aiy_core::security::CredentialManager;
 use aiy_core::security::sanitization::{
     build_secure_review_prompt, sanitize_artifact_content, validate_review_response,
     validate_review_schema,
 };
+use aiy_core::security::CredentialManager;
 use serde_json::Value;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -159,7 +159,10 @@ impl ClaudeClient {
     }
 
     /// Send a messages request
-    async fn send_messages(&self, request: &MessagesRequest) -> Result<MessagesResponse, ClaudeError> {
+    async fn send_messages(
+        &self,
+        request: &MessagesRequest,
+    ) -> Result<MessagesResponse, ClaudeError> {
         let api_key = self.get_api_key().await?;
         let url = format!("{}/messages", self.base_url);
 
@@ -216,7 +219,8 @@ impl ClaudeClient {
         validate_review_schema(&response_json)?;
 
         // Step 7: Parse into AgentReview
-        serde_json::from_value(response_json).map_err(|e| ClaudeError::ResponseParsing(e.to_string()))
+        serde_json::from_value(response_json)
+            .map_err(|e| ClaudeError::ResponseParsing(e.to_string()))
     }
 }
 
@@ -306,7 +310,9 @@ mod tests {
             }
         }"#;
 
-        let mock_transport = Arc::new(MockTransport::with_canned_response(mock_response.to_string()));
+        let mock_transport = Arc::new(MockTransport::with_canned_response(
+            mock_response.to_string(),
+        ));
         let client = ClaudeClient::new_with_mock(manager, mock_transport);
 
         let response = client.generate_text("Hello").await.unwrap();

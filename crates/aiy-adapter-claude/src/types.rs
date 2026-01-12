@@ -39,7 +39,10 @@ pub enum MessageContent {
 pub enum ContentBlock {
     /// Text content block
     #[serde(rename = "text")]
-    Text { text: String },
+    Text {
+        /// The text content of this block
+        text: String,
+    },
 }
 
 /// Messages API request payload
@@ -128,12 +131,9 @@ pub struct Usage {
 impl MessagesResponse {
     /// Extract text content from the response
     pub fn get_text(&self) -> Option<String> {
-        self.content.iter().find_map(|block| {
-            if let ContentBlock::Text { text } = block {
-                Some(text.clone())
-            } else {
-                None
-            }
+        self.content.first().map(|block| {
+            let ContentBlock::Text { text } = block;
+            text.clone()
         })
     }
 }
