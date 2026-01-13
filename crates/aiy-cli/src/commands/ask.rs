@@ -4,15 +4,14 @@
 //! a single AI agent with a prompt and receiving a text response.
 
 use crate::adapters::{create_ask_adapter, AdapterCreationError};
+use crate::credential_helper;
 use crate::registry::{get_agent, is_valid_agent, valid_agents_string};
-use aiy_core::security::{CredentialBackend, CredentialManager};
+use aiy_core::PipelineConfig;
 use chrono::Utc;
 use indicatif::{ProgressBar, ProgressStyle};
 use serde::Serialize;
 use std::io::{self, BufRead, IsTerminal};
-use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::Mutex;
 
 /// Output format for ask results
 #[derive(Debug, Clone, Copy, Default)]
@@ -96,19 +95,11 @@ pub async fn run(args: AskArgs) -> anyhow::Result<()> {
         anyhow::bail!("Prompt cannot be empty. Provide a prompt with --prompt or via stdin.");
     }
 
-    // Get credential path
-    let config_dir = dirs::config_dir()
-        .ok_or_else(|| anyhow::anyhow!("Could not determine config directory"))?;
-    let cred_path = config_dir.join("all-in-yum").join("credentials.enc");
+    // Load config and get unlocked credential manager
+    let config = PipelineConfig::load(&PipelineConfig::config_path()?)
+        .unwrap_or_else(|_| PipelineConfig::default());
 
-    // Create credential manager
-    let credential_manager = CredentialManager::new(CredentialBackend::EncryptedFile {
-        path: cred_path.clone(),
-    })?;
-    let credential_manager = Arc::new(Mutex::new(credential_manager));
-
-    // Unlock credential manager
-    unlock_credentials(&credential_manager, &cred_path).await?;
+    let credential_manager = credential_helper::get_unlocked_credential_manager(&config).await?;
 
     // Create adapter using factory
     let adapter = create_ask_adapter(&agent, credential_manager)
@@ -179,52 +170,6 @@ fn read_prompt_from_stdin() -> anyhow::Result<String> {
     }
 
     Ok(prompt)
-}
-
-/// Unlock the credential manager
-async fn unlock_credentials(
-    credential_manager: &Arc<Mutex<CredentialManager>>,
-    cred_path: &std::path::Path,
-) -> anyhow::Result<()> {
-    // Check if credentials file exists
-    if !cred_path.exists() {
-        anyhow::bail!(
-            "No credentials configured. Set up your API key with:\n  \
-             aiy credentials set <provider>\n\n\
-             Providers: xai (Grok), anthropic (Claude), google (Gemini), openai (Codex)"
-        );
-    }
-
-    // Try to unlock with environment variable or prompt
-    let mut manager = credential_manager.lock().await;
-
-    // First try environment variable
-    if let Ok(password) = std::env::var("AIY_CREDENTIALS_PASSWORD") {
-        manager.unlock(&password).map_err(|_| {
-            anyhow::anyhow!(
-                "Failed to unlock credentials with AIY_CREDENTIALS_PASSWORD.\n\
-                 Check that the password is correct."
-            )
-        })?;
-        return Ok(());
-    }
-
-    // For non-interactive use, require the environment variable
-    if std::io::stdin().is_terminal() {
-        // Interactive: prompt for password
-        let password = rpassword::prompt_password("Enter credentials password: ")?;
-        manager
-            .unlock(&password)
-            .map_err(|_| anyhow::anyhow!("Failed to unlock credentials. Incorrect password?"))?;
-    } else {
-        // Non-interactive: require AIY_CREDENTIALS_PASSWORD
-        anyhow::bail!(
-            "Credentials are locked. Set AIY_CREDENTIALS_PASSWORD environment variable\n\
-             or run interactively to enter the password."
-        );
-    }
-
-    Ok(())
 }
 
 /// Format adapter creation error into a user-friendly message without leaking secrets
