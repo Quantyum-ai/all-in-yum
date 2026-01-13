@@ -3,16 +3,14 @@
 //! Provides the `aiy review <file>` command for reviewing code files using AI agents.
 
 use crate::adapters::create_review_adapter;
+use crate::credential_helper;
 use crate::registry::AGENTS;
 use aiy_adapters::{AgentAdapter, AgentReview, Severity, Verdict};
-use aiy_core::security::{CredentialBackend, CredentialManager};
 use aiy_core::PipelineConfig;
 use colored::*;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::Mutex;
 
 /// Output format for review results
 #[derive(Debug, Clone, Copy, Default)]
@@ -202,8 +200,8 @@ async fn create_adapters(
 ) -> anyhow::Result<Vec<Box<dyn AgentAdapter>>> {
     let mut adapters: Vec<Box<dyn AgentAdapter>> = Vec::new();
 
-    // Get credential manager
-    let credential_manager = get_credential_manager(config)?;
+    // Get unlocked credential manager using shared helper
+    let credential_manager = credential_helper::get_unlocked_credential_manager(config).await?;
 
     // Iterate over registry to create adapters for requested agents
     for agent in AGENTS {
@@ -229,26 +227,6 @@ async fn create_adapters(
     }
 
     Ok(adapters)
-}
-
-/// Get credential manager based on config
-fn get_credential_manager(
-    config: &PipelineConfig,
-) -> anyhow::Result<Arc<Mutex<CredentialManager>>> {
-    // Try system keychain first if preferred
-    if config.credential_backend == "system" {
-        if let Ok(manager) = CredentialManager::new(CredentialBackend::SystemKeychain) {
-            return Ok(Arc::new(Mutex::new(manager)));
-        }
-    }
-
-    // Fallback to encrypted file
-    let config_dir = dirs::config_dir()
-        .ok_or_else(|| anyhow::anyhow!("Could not determine config directory"))?;
-    let cred_path = config_dir.join("all-in-yum").join("credentials.enc");
-
-    let manager = CredentialManager::new(CredentialBackend::EncryptedFile { path: cred_path })?;
-    Ok(Arc::new(Mutex::new(manager)))
 }
 
 /// Display results in pretty format with colors
