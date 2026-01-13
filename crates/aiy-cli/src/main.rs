@@ -4,6 +4,7 @@
 
 pub mod adapters;
 mod commands;
+pub mod credential_helper;
 pub mod registry;
 
 use clap::{Parser, Subcommand, ValueEnum};
