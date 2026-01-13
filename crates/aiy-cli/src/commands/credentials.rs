@@ -2,50 +2,51 @@
 //!
 //! Manages API credentials using aiy-core's secure CredentialManager.
 
+use crate::credential_helper::{self, CREDENTIALS_PASSWORD_ENV};
 use crate::CredentialsCommands;
-use aiy_core::security::{CredentialBackend, CredentialManager};
+use aiy_core::security::CredentialManager;
 use aiy_core::PipelineConfig;
-use std::path::PathBuf;
+use std::io::IsTerminal;
 
-/// Get the credential manager with backend selection
-///
-/// Tries SystemKeychain first, falls back to EncryptedFile if unavailable
+/// Get the credential manager with backend selection and unlock
 fn get_credential_manager() -> anyhow::Result<(CredentialManager, bool)> {
-    // Load config to check backend preference
     let config = PipelineConfig::load(&PipelineConfig::config_path()?)
         .unwrap_or_else(|_| PipelineConfig::default());
 
-    // Try system keychain first if preferred or as fallback
-    if config.credential_backend == "system" {
-        match CredentialManager::new(CredentialBackend::SystemKeychain) {
-            Ok(manager) => {
-                println!("Using system keychain for credentials");
-                return Ok((manager, false)); // No password needed for keychain
-            }
-            Err(e) => {
-                eprintln!("System keychain unavailable: {}", e);
-                eprintln!("Falling back to encrypted file...");
-            }
-        }
-    }
-
-    // Use encrypted file backend
-    let cred_path = get_credential_file_path()?;
-    let manager = CredentialManager::new(CredentialBackend::EncryptedFile {
-        path: cred_path.clone(),
-    })?;
-
-    println!("Using encrypted file: {}", cred_path.display());
-    Ok((manager, true)) // Password needed for encrypted file
+    credential_helper::create_credential_manager(&config)
 }
 
-/// Get the default credential file path
-fn get_credential_file_path() -> anyhow::Result<PathBuf> {
-    let config_dir = dirs::config_dir()
-        .ok_or_else(|| anyhow::anyhow!("Could not determine config directory"))?;
-    let aiy_dir = config_dir.join("all-in-yum");
-    std::fs::create_dir_all(&aiy_dir)?;
-    Ok(aiy_dir.join("credentials.enc"))
+/// Unlock manager using env var or prompt
+fn unlock_manager(manager: &mut CredentialManager, needs_password: bool) -> anyhow::Result<()> {
+    if !needs_password {
+        return Ok(()); // System keychain doesn't need unlock
+    }
+
+    // Try environment variable first (enables non-interactive automation)
+    if let Ok(password) = std::env::var(CREDENTIALS_PASSWORD_ENV) {
+        manager.unlock(&password).map_err(|_| {
+            anyhow::anyhow!(
+                "Failed to unlock credentials with {}.\n\
+                 Check that the password is correct.",
+                CREDENTIALS_PASSWORD_ENV
+            )
+        })?;
+        return Ok(());
+    }
+
+    // Non-interactive: require env var instead of attempting to prompt
+    if !std::io::stdin().is_terminal() {
+        anyhow::bail!(
+            "Credentials are locked. Set {} environment variable\n\
+             or run interactively to enter the password.",
+            CREDENTIALS_PASSWORD_ENV
+        );
+    }
+
+    // Fall back to interactive prompt
+    let password = prompt_password("Enter master password: ")?;
+    manager.unlock(&password)?;
+    Ok(())
 }
 
 /// Prompt for master password securely (no echo)
@@ -71,11 +72,7 @@ pub fn run(cmd: CredentialsCommands) -> anyhow::Result<()> {
     match cmd {
         CredentialsCommands::Status => {
             let (mut manager, needs_password) = get_credential_manager()?;
-
-            if needs_password {
-                let password = prompt_password("Enter master password: ")?;
-                manager.unlock(&password)?;
-            }
+            unlock_manager(&mut manager, needs_password)?;
 
             let providers = manager.list_providers()?;
             let backend = manager.backend();
@@ -98,11 +95,7 @@ pub fn run(cmd: CredentialsCommands) -> anyhow::Result<()> {
 
         CredentialsCommands::Set { provider } => {
             let (mut manager, needs_password) = get_credential_manager()?;
-
-            if needs_password {
-                let password = prompt_password("Enter master password: ")?;
-                manager.unlock(&password)?;
-            }
+            unlock_manager(&mut manager, needs_password)?;
 
             let api_key = prompt_api_key(&provider)?;
             manager.store_key(&provider, &api_key)?;
@@ -113,11 +106,7 @@ pub fn run(cmd: CredentialsCommands) -> anyhow::Result<()> {
 
         CredentialsCommands::Get { provider } => {
             let (mut manager, needs_password) = get_credential_manager()?;
-
-            if needs_password {
-                let password = prompt_password("Enter master password: ")?;
-                manager.unlock(&password)?;
-            }
+            unlock_manager(&mut manager, needs_password)?;
 
             match manager.get_key(&provider) {
                 Ok(key) => {
@@ -137,11 +126,7 @@ pub fn run(cmd: CredentialsCommands) -> anyhow::Result<()> {
 
         CredentialsCommands::Delete { provider } => {
             let (mut manager, needs_password) = get_credential_manager()?;
-
-            if needs_password {
-                let password = prompt_password("Enter master password: ")?;
-                manager.unlock(&password)?;
-            }
+            unlock_manager(&mut manager, needs_password)?;
 
             manager.delete_key(&provider)?;
             println!("✓ Credentials deleted for provider '{}'", provider);
