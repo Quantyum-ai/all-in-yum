@@ -35,5 +35,11 @@ serde_json.workspace = true
 chrono = { version = "0.4", features = ["serde"] }
 regex = "1"
 
+# Integration test that requires the binary
+[[test]]
+name = "cli_smoke_tests"
+path = "tests/cli_smoke_tests.rs"
+
 [dev-dependencies]
 tempfile.workspace = true
+aiy-core = { path = "../aiy-core" }

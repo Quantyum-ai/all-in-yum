@@ -5,9 +5,9 @@
 use aiy_core::security::{CredentialBackend, CredentialManager};
 use aiy_core::PipelineConfig;
 use std::io::IsTerminal;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use std::path::PathBuf;
 
 /// Environment variable for non-interactive credential unlock
 pub const CREDENTIALS_PASSWORD_ENV: &str = "AIY_CREDENTIALS_PASSWORD";
@@ -34,9 +34,7 @@ pub fn create_credential_manager(
 
     // Use encrypted file backend
     let cred_path = get_credential_path()?;
-    let manager = CredentialManager::new(CredentialBackend::EncryptedFile {
-        path: cred_path,
-    })?;
+    let manager = CredentialManager::new(CredentialBackend::EncryptedFile { path: cred_path })?;
     Ok((manager, true)) // File backend needs unlock
 }
 
