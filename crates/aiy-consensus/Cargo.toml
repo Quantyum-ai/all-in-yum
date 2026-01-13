@@ -1,0 +1,21 @@
+[package]
+name = "aiy-consensus"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Consensus engine for All-in-Yum multi-agent code review pipeline"
+
+[dependencies]
+# Workspace dependencies
+aiy-adapters.workspace = true
+async-trait.workspace = true
+tokio.workspace = true
+futures.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
