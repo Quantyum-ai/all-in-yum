@@ -6,6 +6,7 @@ members = [
     "crates/aiy-adapter-claude",
     "crates/aiy-adapter-gemini",
     "crates/aiy-adapter-codex",
+    "crates/aiy-adapter-ollama",
     "crates/aiy-cli",
     "crates/aiy-consensus",
 ]
@@ -57,6 +58,7 @@ tempfile = "3"
 # Utilities
 hex = "0.4"
 dirs = "5"
+url = "2"
 
 # CLI
 clap = { version = "4", features = ["derive"] }

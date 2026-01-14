@@ -9,4 +9,7 @@
 
 mod pipeline;
 
-pub use pipeline::PipelineConfig;
+pub use pipeline::{
+    ConfigError, LocalExecutorConfig, PipelineConfig, PrivacyModeConfig, RagConfig,
+    VerificationConfig,
+};
