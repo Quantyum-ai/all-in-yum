@@ -85,11 +85,41 @@
 //!   - [`enforcement::guard`] - Runtime enforcement
 //!   - [`enforcement::redactor`] - Identifier redaction
 //!   - [`enforcement::audit`] - Metadata-only audit logging
+//!
+//! - [`rag`] - Local RAG (Retrieval-Augmented Generation) system
+//!   - [`rag::types`] - Core types (CodeChunk, ChunkId, etc.)
+//!   - [`rag::chunk`] - Chunking strategies
+//!   - [`rag::store`] - In-memory vector store
+//!   - [`rag::embedder`] - Local embedding generation
+//!   - [`rag::indexer`] - Directory indexing
+//!   - [`rag::query`] - Query processing
+//!
+//! - [`verification`] - Verification engine for privacy mode
+//!   - [`verification::types`] - Result and failure types
+//!   - [`verification::stages`] - Verification stages (fmt, clippy, test)
+//!   - [`verification::repair`] - Automatic repair generation
+//!   - [`verification::engine`] - Main verification engine
 
 pub mod enforcement;
+pub mod rag;
+pub mod verification;
 
 // Re-export commonly used types at crate root
 pub use enforcement::{
     GuardError, GuardMode, PrivacyGuard, PrivacyPolicy, RedactionAudit, RedactionMap, Redactor,
     Violation, ViolationCategory,
+};
+
+// Re-export RAG types
+pub use rag::{
+    ChunkId, ChunkType, ChunkingStrategy, CodeChunk, CodeIndexer, Embedder, InMemoryVectorStore,
+    LocalEmbedder, QueryProcessor, QueryResult, RagError, RagSystem, RagSystemConfig, RankedChunk,
+};
+
+// Re-export Verification types
+pub use verification::{
+    BackoffConfig, ClippyStage, CodeLocation, DiagnosticSeverity, EngineConfig, FailureType,
+    FmtStage, Repair, RepairConfig, RepairGenerator, RepairSummary, StageConfig, StageFailure,
+    StageResult, TestStage, VerificationEngine, VerificationError, VerificationResult,
+    VerificationStage, VerificationState,
 };

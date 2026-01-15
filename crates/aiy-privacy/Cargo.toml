@@ -11,6 +11,7 @@ description = "Privacy enforcement for All-in-Yum privacy mode - keeps code loca
 # Workspace dependencies
 aiy-core = { path = "../aiy-core" }
 aiy-adapters = { path = "../aiy-adapters" }
+aiy-adapter-ollama = { path = "../aiy-adapter-ollama" }
 tokio.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -19,12 +20,21 @@ async-trait.workspace = true
 regex.workspace = true
 once_cell.workspace = true
 tracing.workspace = true
+zeroize.workspace = true
 
 # UUID generation for opaque IDs
 uuid = { version = "1", features = ["v4"] }
+
+# RAG system dependencies
+glob = "0.3"
+walkdir = "2"
+
+# HTTP client for embeddings (feature-gated)
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"], optional = true }
 
 [dev-dependencies]
 tempfile.workspace = true
 
 [features]
 default = []
+http = ["dep:reqwest"]
