@@ -9,6 +9,7 @@ members = [
     "crates/aiy-adapter-ollama",
     "crates/aiy-cli",
     "crates/aiy-consensus",
+    "crates/aiy-privacy",
 ]
 resolver = "2"
 

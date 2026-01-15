@@ -1,0 +1,30 @@
+[package]
+name = "aiy-privacy"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Privacy enforcement for All-in-Yum privacy mode - keeps code local"
+
+[dependencies]
+# Workspace dependencies
+aiy-core = { path = "../aiy-core" }
+aiy-adapters = { path = "../aiy-adapters" }
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+async-trait.workspace = true
+regex.workspace = true
+once_cell.workspace = true
+tracing.workspace = true
+
+# UUID generation for opaque IDs
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[features]
+default = []
