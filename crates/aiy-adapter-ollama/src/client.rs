@@ -107,7 +107,7 @@ impl OllamaClient {
 
     /// Set the model by name
     pub fn with_model_name(mut self, name: &str) -> Self {
-        self.model = OllamaModel::from_str(name);
+        self.model = OllamaModel::parse_model(name);
         self
     }
 

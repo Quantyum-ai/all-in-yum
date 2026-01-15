@@ -3,39 +3,36 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-/// Supported Ollama models for privacy mode
+/// Supported Ollama models for privacy mode.
+///
+/// **National Security Policy**: Privacy mode defaults to US-based models only.
+/// Non-US models (DeepSeek, Qwen) have been removed from this enum to comply
+/// with national security requirements for on-premises deployments.
+///
+/// If you need to use non-US models, use the `Custom` variant with explicit acknowledgment.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum OllamaModel {
-    /// CodeLlama 7B Instruct - Default for privacy mode
+    /// CodeLlama 7B Instruct - Default for privacy mode (US-based, Meta)
     #[serde(rename = "codellama:7b-instruct")]
     CodeLlama7bInstruct,
 
-    /// CodeLlama 13B Instruct - Better quality, more memory
+    /// CodeLlama 13B Instruct - Better quality, more memory (US-based, Meta)
     #[serde(rename = "codellama:13b-instruct")]
     CodeLlama13bInstruct,
 
-    /// CodeLlama 34B Instruct - Best quality, requires significant memory
+    /// CodeLlama 34B Instruct - Best quality, requires significant memory (US-based, Meta)
     #[serde(rename = "codellama:34b-instruct")]
     CodeLlama34bInstruct,
 
-    /// DeepSeek Coder 6.7B Instruct
-    #[serde(rename = "deepseek-coder:6.7b-instruct")]
-    DeepSeekCoder6_7bInstruct,
-
-    /// DeepSeek Coder 33B Instruct
-    #[serde(rename = "deepseek-coder:33b-instruct")]
-    DeepSeekCoder33bInstruct,
-
-    /// Llama 3.2 3B - Lightweight general model
+    /// Llama 3.2 3B - Lightweight general model (US-based, Meta)
     #[serde(rename = "llama3.2:3b")]
     Llama3_2_3b,
 
-    /// Qwen 2.5 Coder 7B Instruct
-    #[serde(rename = "qwen2.5-coder:7b-instruct")]
-    Qwen2_5Coder7bInstruct,
-
     /// Custom model specified by string
+    ///
+    /// **Warning**: If using non-US models (DeepSeek, Qwen, etc.), ensure compliance
+    /// with your organization's security and export control policies.
     #[serde(untagged)]
     Custom(String),
 }
@@ -47,10 +44,7 @@ impl OllamaModel {
             OllamaModel::CodeLlama7bInstruct => "codellama:7b-instruct",
             OllamaModel::CodeLlama13bInstruct => "codellama:13b-instruct",
             OllamaModel::CodeLlama34bInstruct => "codellama:34b-instruct",
-            OllamaModel::DeepSeekCoder6_7bInstruct => "deepseek-coder:6.7b-instruct",
-            OllamaModel::DeepSeekCoder33bInstruct => "deepseek-coder:33b-instruct",
             OllamaModel::Llama3_2_3b => "llama3.2:3b",
-            OllamaModel::Qwen2_5Coder7bInstruct => "qwen2.5-coder:7b-instruct",
             OllamaModel::Custom(name) => name.as_str(),
         }
     }
@@ -66,10 +60,7 @@ impl OllamaModel {
             OllamaModel::CodeLlama7bInstruct => 8192,
             OllamaModel::CodeLlama13bInstruct => 8192,
             OllamaModel::CodeLlama34bInstruct => 16384,
-            OllamaModel::DeepSeekCoder6_7bInstruct => 16384,
-            OllamaModel::DeepSeekCoder33bInstruct => 16384,
-            OllamaModel::Llama3_2_3b => 128000, // Llama 3.2 has large context
-            OllamaModel::Qwen2_5Coder7bInstruct => 32768,
+            OllamaModel::Llama3_2_3b => 128000,
             OllamaModel::Custom(_) => 8192, // Conservative default
         }
     }
@@ -80,10 +71,7 @@ impl OllamaModel {
             OllamaModel::CodeLlama7bInstruct => 3.8,
             OllamaModel::CodeLlama13bInstruct => 7.4,
             OllamaModel::CodeLlama34bInstruct => 19.0,
-            OllamaModel::DeepSeekCoder6_7bInstruct => 3.8,
-            OllamaModel::DeepSeekCoder33bInstruct => 18.5,
             OllamaModel::Llama3_2_3b => 2.0,
-            OllamaModel::Qwen2_5Coder7bInstruct => 4.7,
             OllamaModel::Custom(_) => 0.0, // Unknown
         }
     }
@@ -94,24 +82,20 @@ impl OllamaModel {
             OllamaModel::CodeLlama7bInstruct => true,
             OllamaModel::CodeLlama13bInstruct => true,
             OllamaModel::CodeLlama34bInstruct => true,
-            OllamaModel::DeepSeekCoder6_7bInstruct => true,
-            OllamaModel::DeepSeekCoder33bInstruct => true,
             OllamaModel::Llama3_2_3b => false,
-            OllamaModel::Qwen2_5Coder7bInstruct => true,
             OllamaModel::Custom(_) => false, // Unknown
         }
     }
 
     /// Parse a model name string into an OllamaModel
-    pub fn from_str(name: &str) -> Self {
+    pub fn parse_model(name: &str) -> Self {
         match name {
             "codellama:7b-instruct" => OllamaModel::CodeLlama7bInstruct,
             "codellama:13b-instruct" => OllamaModel::CodeLlama13bInstruct,
             "codellama:34b-instruct" => OllamaModel::CodeLlama34bInstruct,
-            "deepseek-coder:6.7b-instruct" => OllamaModel::DeepSeekCoder6_7bInstruct,
-            "deepseek-coder:33b-instruct" => OllamaModel::DeepSeekCoder33bInstruct,
             "llama3.2:3b" => OllamaModel::Llama3_2_3b,
-            "qwen2.5-coder:7b-instruct" => OllamaModel::Qwen2_5Coder7bInstruct,
+            // Non-US models (DeepSeek, Qwen) removed for national security compliance
+            // Users can still access via Custom variant if needed
             other => OllamaModel::Custom(other.to_string()),
         }
     }
@@ -150,19 +134,19 @@ mod tests {
     #[test]
     fn test_code_optimized_models() {
         assert!(OllamaModel::CodeLlama7bInstruct.is_code_optimized());
-        assert!(OllamaModel::DeepSeekCoder6_7bInstruct.is_code_optimized());
+        assert!(OllamaModel::CodeLlama13bInstruct.is_code_optimized());
         assert!(!OllamaModel::Llama3_2_3b.is_code_optimized());
     }
 
     #[test]
-    fn test_from_str_known_model() {
-        let model = OllamaModel::from_str("codellama:7b-instruct");
+    fn test_parse_model_known() {
+        let model = OllamaModel::parse_model("codellama:7b-instruct");
         assert_eq!(model, OllamaModel::CodeLlama7bInstruct);
     }
 
     #[test]
-    fn test_from_str_custom_model() {
-        let model = OllamaModel::from_str("my-custom-model:latest");
+    fn test_parse_model_custom() {
+        let model = OllamaModel::parse_model("my-custom-model:latest");
         match model {
             OllamaModel::Custom(name) => assert_eq!(name, "my-custom-model:latest"),
             _ => panic!("Expected Custom variant"),
