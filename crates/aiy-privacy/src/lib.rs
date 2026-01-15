@@ -101,6 +101,7 @@
 //!   - [`verification::engine`] - Main verification engine
 
 pub mod enforcement;
+pub mod orchestration;
 pub mod rag;
 pub mod verification;
 
@@ -122,4 +123,11 @@ pub use verification::{
     FmtStage, Repair, RepairConfig, RepairGenerator, RepairSummary, StageConfig, StageFailure,
     StageResult, TestStage, VerificationEngine, VerificationError, VerificationResult,
     VerificationStage, VerificationState,
+};
+
+// Re-export Orchestration types
+pub use orchestration::{
+    CloudCommunicator, CloudRequestBuilder, ExecutionPlan, LocalExecutor, LocalExecutorConfig,
+    OrchestrationError, OrchestrationResult, OrchestrationSession, OrchestratorConfig,
+    PlanParser, PlanTask, PrivacyOrchestrator, SessionState, SessionStats, TaskResult, TaskType,
 };
