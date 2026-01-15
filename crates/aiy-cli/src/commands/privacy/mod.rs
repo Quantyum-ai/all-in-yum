@@ -4,6 +4,8 @@
 
 pub mod config;
 pub mod status;
+pub mod workflow;
 
 pub use config::*;
 pub use status::*;
+pub use workflow::OutputFormat as WorkflowOutputFormat;

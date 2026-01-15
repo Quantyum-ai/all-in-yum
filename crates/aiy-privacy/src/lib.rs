@@ -104,6 +104,7 @@ pub mod enforcement;
 pub mod orchestration;
 pub mod rag;
 pub mod verification;
+pub mod workflow;
 
 // Re-export commonly used types at crate root
 pub use enforcement::{
@@ -131,3 +132,6 @@ pub use orchestration::{
     OrchestrationError, OrchestrationResult, OrchestrationSession, OrchestratorConfig,
     PlanParser, PlanTask, PrivacyOrchestrator, SessionState, SessionStats, TaskResult, TaskType,
 };
+
+// Re-export Workflow types
+pub use workflow::{WorkflowError, WorkflowResult, WorkflowState, WorkflowStateName};

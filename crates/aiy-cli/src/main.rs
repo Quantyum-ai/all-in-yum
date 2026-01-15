@@ -191,6 +191,50 @@ pub enum PrivacyCommands {
     /// Privacy configuration subcommands
     #[command(subcommand)]
     Config(PrivacyConfigCommands),
+
+    /// Initialize privacy workflow in current directory
+    Init {
+        /// Path to initialize (default: current repository root)
+        #[arg(short, long)]
+        path: Option<PathBuf>,
+    },
+
+    /// Execute a request via privacy orchestrator
+    Execute {
+        /// Request to execute
+        request: String,
+
+        /// Agent for cloud planning (e.g., claude, grok)
+        #[arg(short, long, default_value = "claude")]
+        agent: String,
+
+        /// Output format
+        #[arg(short, long, value_enum, default_value = "text")]
+        format: WorkflowOutputFormatArg,
+    },
+
+    /// Show workflow status
+    WorkflowStatus {
+        /// Output format
+        #[arg(short, long, value_enum, default_value = "text")]
+        format: WorkflowOutputFormatArg,
+    },
+
+    /// Resume a paused workflow
+    Resume,
+
+    /// Cancel an active workflow
+    Cancel,
+}
+
+/// Output format for workflow commands
+#[derive(Debug, Clone, Copy, Default, ValueEnum)]
+pub enum WorkflowOutputFormatArg {
+    /// Human-readable text output
+    #[default]
+    Text,
+    /// JSON output for scripting
+    Json,
 }
 
 /// Privacy configuration subcommands
@@ -313,6 +357,37 @@ async fn main() -> anyhow::Result<()> {
                         commands::privacy::reset_config(repo_root.as_deref())
                     }
                 },
+                PrivacyCommands::Init { path } => {
+                    commands::privacy::workflow::init(path).await
+                }
+                PrivacyCommands::Execute {
+                    request,
+                    agent,
+                    format,
+                } => {
+                    let output_format = match format {
+                        WorkflowOutputFormatArg::Text => {
+                            commands::privacy::WorkflowOutputFormat::Text
+                        }
+                        WorkflowOutputFormatArg::Json => {
+                            commands::privacy::WorkflowOutputFormat::Json
+                        }
+                    };
+                    commands::privacy::workflow::execute(request, agent, output_format).await
+                }
+                PrivacyCommands::WorkflowStatus { format } => {
+                    let output_format = match format {
+                        WorkflowOutputFormatArg::Text => {
+                            commands::privacy::WorkflowOutputFormat::Text
+                        }
+                        WorkflowOutputFormatArg::Json => {
+                            commands::privacy::WorkflowOutputFormat::Json
+                        }
+                    };
+                    commands::privacy::workflow::workflow_status(output_format)
+                }
+                PrivacyCommands::Resume => commands::privacy::workflow::resume().await,
+                PrivacyCommands::Cancel => commands::privacy::workflow::cancel().await,
             }
         }
     }
