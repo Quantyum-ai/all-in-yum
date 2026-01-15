@@ -13,7 +13,7 @@ path = "src/main.rs"
 
 [features]
 default = []
-http = ["aiy-adapter-grok/http", "aiy-adapter-claude/http", "aiy-adapter-codex/http", "aiy-adapter-gemini/http"]
+http = ["aiy-adapter-grok/http", "aiy-adapter-claude/http", "aiy-adapter-codex/http", "aiy-adapter-gemini/http", "aiy-adapter-ollama/http", "aiy-privacy/http"]
 
 [dependencies]
 aiy-core = { path = "../aiy-core" }
@@ -22,6 +22,8 @@ aiy-adapter-grok = { path = "../aiy-adapter-grok" }
 aiy-adapter-claude = { path = "../aiy-adapter-claude" }
 aiy-adapter-gemini = { path = "../aiy-adapter-gemini" }
 aiy-adapter-codex = { path = "../aiy-adapter-codex" }
+aiy-adapter-ollama = { path = "../aiy-adapter-ollama" }
+aiy-privacy = { path = "../aiy-privacy" }
 clap.workspace = true
 tokio.workspace = true
 anyhow.workspace = true

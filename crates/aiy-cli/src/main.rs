@@ -70,6 +70,10 @@ pub enum Commands {
     /// Manage API credentials for AI providers
     #[command(subcommand)]
     Credentials(CredentialsCommands),
+
+    /// Privacy mode management
+    #[command(subcommand)]
+    Privacy(PrivacyCommands),
 }
 
 /// Output format for review results
@@ -161,6 +165,59 @@ pub enum CredentialsCommands {
     },
 }
 
+/// Privacy mode subcommands
+#[derive(Subcommand)]
+pub enum PrivacyCommands {
+    /// Show privacy mode status and configuration
+    Status,
+
+    /// Enable privacy mode
+    Enable {
+        /// Ollama server URL (default: http://127.0.0.1:11434)
+        #[arg(long)]
+        ollama_url: Option<String>,
+
+        /// Model to use for local code generation
+        #[arg(long)]
+        model: Option<String>,
+    },
+
+    /// Disable privacy mode
+    Disable,
+
+    /// Check Ollama setup and model availability
+    Check,
+
+    /// Privacy configuration subcommands
+    #[command(subcommand)]
+    Config(PrivacyConfigCommands),
+}
+
+/// Privacy configuration subcommands
+#[derive(Subcommand)]
+pub enum PrivacyConfigCommands {
+    /// Show privacy configuration
+    Show,
+
+    /// Set a privacy configuration value
+    Set {
+        /// Configuration key (e.g., model, context_size, token_budget)
+        key: String,
+
+        /// Value to set
+        value: String,
+    },
+
+    /// Get a privacy configuration value
+    Get {
+        /// Configuration key
+        key: String,
+    },
+
+    /// Reset privacy configuration to defaults
+    Reset,
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
@@ -232,5 +289,31 @@ async fn main() -> anyhow::Result<()> {
         },
 
         Commands::Credentials(cmd) => commands::credentials::run(cmd),
+
+        Commands::Privacy(cmd) => {
+            let repo_root = commands::privacy::detect_repo_root();
+            match cmd {
+                PrivacyCommands::Status => commands::privacy::status(repo_root.as_deref()),
+                PrivacyCommands::Enable { ollama_url, model } => {
+                    commands::privacy::enable(repo_root.as_deref(), ollama_url, model)
+                }
+                PrivacyCommands::Disable => commands::privacy::disable(repo_root.as_deref()),
+                PrivacyCommands::Check => commands::privacy::check(repo_root.as_deref()).await,
+                PrivacyCommands::Config(config_cmd) => match config_cmd {
+                    PrivacyConfigCommands::Show => {
+                        commands::privacy::show_config(repo_root.as_deref())
+                    }
+                    PrivacyConfigCommands::Set { key, value } => {
+                        commands::privacy::set_config(repo_root.as_deref(), &key, &value)
+                    }
+                    PrivacyConfigCommands::Get { key } => {
+                        commands::privacy::get_config(repo_root.as_deref(), &key)
+                    }
+                    PrivacyConfigCommands::Reset => {
+                        commands::privacy::reset_config(repo_root.as_deref())
+                    }
+                },
+            }
+        }
     }
 }
