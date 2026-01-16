@@ -1,7 +1,7 @@
 # PRP: Privacy Mode 2.5.3b — Test Stabilization to 100% GREEN
 
 **Branch**: `feat/privacy-mode-253b`
-**Objective**: Remove all 12 `#[ignore]` markers from unit tests and achieve 0 failures, 0 ignored, clippy clean
+**Objective**: Remove all `#[ignore]` markers from unit tests (`crates/aiy-privacy/src/**`) and achieve 0 test failures with clippy clean.
 **Scope**: Test infrastructure fixes ONLY - no architecture changes
 
 ## Definition of Done (100% GREEN)
@@ -9,9 +9,9 @@
 ```bash
 # Must ALL pass:
 timeout 15m cargo test -p aiy-privacy -- --test-threads=1
-# → 289 passed; 0 failed; 0 ignored
+# → 0 failed (an `ignored` count is acceptable **only** for clearly-labeled manual integration tests under `crates/aiy-privacy/tests/**`)
 
-rg -n "#\[ignore\]" crates/aiy-privacy/src
+rg -n "#\[ignore\]" crates/aiy-privacy/src || true
 # → no matches (empty output)
 
 timeout 15m cargo clippy --workspace --all-targets -- -D warnings
@@ -188,7 +188,7 @@ Tests: rag::chunk:: now 100% passing"
 
 Glob pattern `target/**` tested against absolute path `/tmp/.tmpXXX/target/debug.rs` doesn't match because pattern doesn't include `/tmp/...` prefix.
 
-### Fix Implementation
+### Fix Implementation (match current code structure)
 
 **Step 2.1**: Find `is_excluded()` method
 ```bash
@@ -201,70 +201,48 @@ rg -n "fn is_excluded" crates/aiy-privacy/src/rag/indexer.rs
 sed -n '93,125p' crates/aiy-privacy/src/rag/indexer.rs
 ```
 
-**Step 2.3**: Update signature and logic
+**Step 2.3**: Update `IndexerConfig::is_excluded()` to suffix-match absolute paths
 
-Change from:
+The current code uses `glob::Pattern` objects in `exclude_patterns` and calls `pattern.matches(...)` against `path.to_string_lossy()`.
+This fails for patterns like `target/**` when `path` is absolute (e.g., `/tmp/.../target/debug.rs`).
+
+Implement **suffix/segment matching** without changing the public signature:
+
+- Keep the current absolute path check (cheap)
+- Also build and test suffixes such as `target/debug.rs`, `src/utils.rs`, `.git/config`, etc.
+- Normalize path separators to `/` before matching (Windows-safe)
+
+Pseudo-code sketch (adapt to existing code style; no new deps):
 ```rust
 pub fn is_excluded(&self, path: &Path) -> bool {
-    // Matches against full absolute path
-}
-```
+    let components: Vec<String> = path
+        .components()
+        .filter_map(|c| c.as_os_str().to_str().map(|s| s.to_string()))
+        .collect();
 
-To:
-```rust
-pub fn is_excluded(&self, path: &Path, root: &Path) -> bool {
-    let rel_path = path.strip_prefix(root).unwrap_or(path);
-    let rel_str = rel_path.to_string_lossy();
+    // Generate suffixes like "target/debug.rs"
+    let suffixes = (0..components.len()).map(|start| components[start..].join("/"));
 
-    for pattern_str in &self.exclude_patterns {
-        let pattern = Pattern::new(pattern_str).ok()?;
-
-        // Test relative path
-        if pattern.matches(&rel_str) {
+    for pattern in &self.exclude_patterns {
+        // Preserve current behavior (absolute or raw)
+        let raw = path.to_string_lossy().replace('\\', "/");
+        if pattern.matches(&raw) {
             return true;
         }
 
-        // Test all suffixes (for nested matches)
-        for ancestor in rel_path.ancestors().skip(1) {
-            if let Ok(suffix) = rel_path.strip_prefix(ancestor) {
-                let suffix_str = suffix.to_string_lossy();
-                if !suffix_str.is_empty() && pattern.matches(&suffix_str) {
-                    return true;
-                }
+        // New behavior: suffix match
+        for suffix in suffixes.clone() {
+            if pattern.matches(&suffix) {
+                return true;
             }
         }
     }
+
     false
 }
 ```
 
-**Step 2.4**: Fix `is_hidden()` similarly
-```rust
-pub fn is_hidden(&self, path: &Path, root: &Path) -> bool {
-    let rel_path = path.strip_prefix(root).unwrap_or(path);
-    rel_path.components().any(|c| {
-        c.as_os_str().to_string_lossy().starts_with('.')
-    })
-}
-```
-
-**Step 2.5**: Update `collect_files()` to pass `root`
-```bash
-# Find collect_files method (around line 124-180)
-rg -n "fn collect_files" crates/aiy-privacy/src/rag/indexer.rs
-```
-
-Change calls from:
-```rust
-if self.config.is_excluded(path) { ... }
-if self.config.is_hidden(path) { ... }
-```
-
-To:
-```rust
-if self.config.is_excluded(path, root) { ... }
-if self.config.is_hidden(path, root) { ... }
-```
+Important: keep this deterministic and minimal. Do **not** introduce a new `root` parameter or a new `is_hidden()` API — hidden directories are already filtered via `create_walker()` in `CodeIndexer`.
 
 **Step 2.6**: Test EACH test individually
 ```bash
@@ -535,7 +513,10 @@ timeout 15m cargo clippy --workspace --all-targets -- -D warnings 2>&1 | tail -1
 
 **Step 4.5**: Commit
 ```bash
-git add .
+git add crates/aiy-privacy/src/verification/engine.rs crates/aiy-privacy/tests/verification_integration.rs
+# Add only the specific files you touched for clippy cleanup; do NOT stage quarantined Phase 4 artifacts:
+# - .github/workflows/
+# - crates/aiy-privacy/tests/integration_tests.rs
 git commit -m "chore: move verification integration test; fix clippy warnings
 
 - Move test_engine_run_on_valid_project to tests/verification_integration.rs
@@ -565,7 +546,7 @@ rg -n "#\[ignore\]" crates/aiy-privacy/src || true
 ```bash
 timeout 15m cargo test -p aiy-privacy -- --test-threads=1 2>&1 | grep "test result:"
 ```
-**Expected**: "test result: ok. 289 passed; 0 failed; Y ignored" (Y = integration tests in tests/ only)
+**Expected**: `0 failed`. An `ignored` count is acceptable only if it comes from clearly-labeled manual integration tests under `crates/aiy-privacy/tests/**` (never from `crates/aiy-privacy/src/**`).
 
 ### Ollama Tests
 ```bash
@@ -650,7 +631,7 @@ DO NOT touch until after Commit 4 is green:
 |--------|---------|--------|
 | Unit test ignores in `src/` | 12 | 0 |
 | Test failures | 0 | 0 |
-| Test pass rate | 277/289 (96%) | 289/289 (100%) |
+| Test pass rate | 277 passed; 12 ignored | 0 failed; 0 ignores in `src/` |
 | Clippy `-D warnings` | Not verified | PASS |
 | Commits on branch | 10 | 14 (10 + 4 new) |
 
