@@ -113,18 +113,35 @@ impl IndexerConfig {
 
     /// Check if a path should be excluded.
     pub fn is_excluded(&self, path: &Path) -> bool {
-        let path_str = path.to_string_lossy();
+        // Normalize path to forward slashes for consistent matching
+        let path_str = path.to_string_lossy().replace('\\', "/");
+
+        // Collect path components for suffix matching
+        let components: Vec<&str> = path
+            .components()
+            .filter_map(|c| c.as_os_str().to_str())
+            .collect();
 
         for pattern in &self.exclude_patterns {
+            // Check full path (preserves current behavior for absolute patterns)
             if pattern.matches(&path_str) {
                 return true;
             }
-            // Also check just the relative path components
-            for component in path.components() {
-                if let Some(s) = component.as_os_str().to_str() {
-                    if pattern.matches(s) {
-                        return true;
-                    }
+
+            // Check individual components (e.g., ".git", "target")
+            for component in &components {
+                if pattern.matches(component) {
+                    return true;
+                }
+            }
+
+            // Suffix matching: test patterns against all path suffixes
+            // e.g., for /tmp/project/target/debug.rs, test:
+            //   "target/debug.rs", "debug.rs"
+            for start in 0..components.len() {
+                let suffix = components[start..].join("/");
+                if pattern.matches(&suffix) {
+                    return true;
                 }
             }
         }
@@ -314,10 +331,10 @@ impl CodeIndexer {
             .follow_links(self.config.follow_symlinks)
             .into_iter()
             .filter_entry(|e| {
-                // Skip hidden directories
-                if e.file_type().is_dir() {
+                // Skip hidden directories (but not the root directory)
+                if e.file_type().is_dir() && e.depth() > 0 {
                     if let Some(name) = e.file_name().to_str() {
-                        if name.starts_with('.') && name != "." {
+                        if name.starts_with('.') {
                             return false;
                         }
                     }
@@ -425,6 +442,14 @@ mod tests {
         assert!(config.is_excluded(Path::new(".git/config")));
         assert!(config.is_excluded(Path::new("node_modules/package/index.js")));
         assert!(!config.is_excluded(Path::new("src/main.rs")));
+
+        // Test absolute paths that should be excluded
+        assert!(config.is_excluded(Path::new("/tmp/xyz/target/debug.rs")));
+        assert!(config.is_excluded(Path::new("/tmp/xyz/.git/config")));
+
+        // Test absolute paths that should NOT be excluded
+        assert!(!config.is_excluded(Path::new("/tmp/xyz/main.rs")));
+        assert!(!config.is_excluded(Path::new("/tmp/xyz/src/utils.rs")));
     }
 
     #[test]
