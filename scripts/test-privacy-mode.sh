@@ -79,9 +79,10 @@ record_result() {
 }
 
 do_cleanup() {
-    # Restore privacy mode to disabled state (best effort)
-    if [[ -x "$BINARY" ]]; then
-        "$BINARY" privacy disable 2>/dev/null || true
+    # Restore privacy mode to disabled state in the TEMP repo only (best effort).
+    # Avoid touching $REPO_ROOT because enable/disable writes .aiy/config.toml in the CWD.
+    if [[ -x "$BINARY" && -n "${TEST_TMPDIR:-}" && -d "$TEST_TMPDIR" ]]; then
+        (cd "$TEST_TMPDIR" && "$BINARY" privacy disable 2>/dev/null) || true
     fi
 
     # Remove temp directory safely (no -rf, explicit path check)
@@ -151,7 +152,8 @@ step_build() {
 
     cd "$REPO_ROOT"
 
-    if timeout 10m cargo build -p aiy-cli --release 2>&1 | tail -5; then
+    # Privacy mode local executor (Ollama) requires the `http` feature.
+    if timeout 10m cargo build -p aiy-cli --release --features http 2>&1 | tail -5; then
         if [[ -x "$BINARY" ]]; then
             log_pass "Build successful: $BINARY"
             record_result "build" "PASS"
@@ -170,7 +172,12 @@ step_build() {
 step_privacy_check() {
     log_info "=== Step 3: Privacy Mode Check ==="
 
-    cd "$REPO_ROOT"
+    # Run checks inside the TEMP repo when available to avoid creating `.aiy/` in $REPO_ROOT.
+    if [[ -n "${TEST_TMPDIR:-}" && -d "$TEST_TMPDIR" ]]; then
+        cd "$TEST_TMPDIR"
+    else
+        cd "$REPO_ROOT"
+    fi
 
     # Check if privacy subcommand exists
     if ! "$BINARY" privacy --help &>/dev/null; then
@@ -179,19 +186,25 @@ step_privacy_check() {
         return 1
     fi
 
-    # Run privacy check
+    # Run privacy check (required)
     local check_output
     if check_output=$("$BINARY" privacy check 2>&1); then
         echo "$check_output" | head -10 | sed 's/^/    /'
-        log_pass "Privacy check command works"
-    else
-        # Check might fail due to Ollama not running - that's OK for offline test
-        if echo "$check_output" | grep -qi "ollama\|connection\|refused"; then
-            log_warn "Privacy check: Ollama not available (expected for offline test)"
-            echo "$check_output" | head -5 | sed 's/^/    /'
-        else
-            echo "$check_output" | head -10 | sed 's/^/    /'
+        # Some versions of `aiy privacy check` print failures but still exit 0.
+        # Treat any "[FAIL]" markers as a hard failure for this preflight.
+        if echo "$check_output" | grep -q "\\[FAIL\\]"; then
+            log_fail "Privacy check reported failures (see output above)"
+            record_result "privacy_check" "FAIL"
+            return 1
         fi
+
+        log_pass "Privacy check passed"
+        record_result "privacy_check" "PASS"
+    else
+        echo "$check_output" | head -15 | sed 's/^/    /'
+        log_fail "Privacy check failed (Ollama must be reachable for privacy mode)"
+        record_result "privacy_check" "FAIL"
+        return 1
     fi
 
     # Show config (non-destructive)
@@ -203,13 +216,18 @@ step_privacy_check() {
     fi
 
     log_pass "Privacy check commands executed"
-    record_result "privacy_check" "PASS"
 }
 
 step_enable_disable_sanity() {
     log_info "=== Step 4: Enable/Disable Sanity Test ==="
 
-    cd "$REPO_ROOT"
+    if [[ -z "${TEST_TMPDIR:-}" || ! -d "$TEST_TMPDIR" ]]; then
+        log_fail "Temp repo not initialized; cannot run enable/disable sanity safely"
+        record_result "enable_disable_sanity" "FAIL"
+        return 1
+    fi
+
+    cd "$TEST_TMPDIR"
 
     # Enable with loopback URL and small model
     log_info "Enabling privacy mode with loopback Ollama..."
@@ -287,21 +305,20 @@ EOF
 
     log_info "Initialized test repo at $TEST_TMPDIR"
 
-    # Run privacy init
-    cd "$REPO_ROOT"
-    if "$BINARY" privacy init --path "$TEST_TMPDIR" 2>&1 | head -10 | sed 's/^/    /'; then
-        log_pass "Privacy init on temp repo succeeded"
-        record_result "temp_repo_init" "PASS"
-    else
-        log_warn "Privacy init had issues (may be expected without Ollama)"
-        record_result "temp_repo_init" "PASS"  # Non-blocking
-    fi
+    log_pass "Temp repo created and committed"
+    record_result "temp_repo_init" "PASS"
 }
 
 step_offline_orchestration_check() {
     log_info "=== Step 6: Offline Orchestration Check ==="
 
-    cd "$REPO_ROOT"
+    if [[ -z "${TEST_TMPDIR:-}" || ! -d "$TEST_TMPDIR" ]]; then
+        log_fail "Temp repo not initialized; cannot run orchestration checks"
+        record_result "offline_orchestration" "FAIL"
+        return 1
+    fi
+
+    cd "$TEST_TMPDIR"
 
     # Try status and check commands (these should work offline)
     log_info "Running offline-safe commands..."
@@ -309,22 +326,37 @@ step_offline_orchestration_check() {
     "$BINARY" privacy status 2>&1 | head -5 | sed 's/^/    /' || true
     "$BINARY" privacy check 2>&1 | head -5 | sed 's/^/    /' || true
 
-    # If execute command exists, try it but expect credential/network skip
+    # `privacy execute` requires a cloud planner + credentials; keep this offline-safe by default.
     if "$BINARY" privacy execute --help &>/dev/null 2>&1; then
-        log_info "Testing execute command (expecting offline skip)..."
-        local exec_output
-        exec_output=$("$BINARY" privacy execute --dry-run 2>&1 || true)
+        local agent_status
+        agent_status=$("$BINARY" agents status 2>&1 || true)
 
-        if echo "$exec_output" | grep -qiE "credential|api.key|network|offline|connection|refused"; then
-            log_skip "Execute skipped (requires cloud credentials or network)"
+        if echo "$agent_status" | grep -qiE "0 of .* ready|No agents are ready"; then
+            log_skip "Execute skipped (no cloud credentials configured)"
+            record_result "offline_orchestration" "SKIP" "false"
+        elif [[ "${AIY_ALLOW_CLOUD_EXECUTE:-0}" != "1" ]]; then
+            log_skip "Execute skipped (set AIY_ALLOW_CLOUD_EXECUTE=1 to actually run cloud planning)"
             record_result "offline_orchestration" "SKIP" "false"
         else
-            echo "$exec_output" | head -5 | sed 's/^/    /'
-            log_pass "Execute command responded"
-            record_result "offline_orchestration" "PASS"
+            log_info "AIY_ALLOW_CLOUD_EXECUTE=1 set; running execute (may require network)..."
+            local exec_output
+            exec_output=$(timeout 2m "$BINARY" privacy execute "Sanity request" --agent claude --format json 2>&1 || true)
+            echo "$exec_output" | head -10 | sed 's/^/    /'
+
+            if echo "$exec_output" | grep -qiE "No credentials configured|Missing credentials"; then
+                log_skip "Execute skipped (credentials missing)"
+                record_result "offline_orchestration" "SKIP" "false"
+            elif echo "$exec_output" | grep -qiE "connection refused|timed out|network"; then
+                log_fail "Execute failed due to connectivity"
+                record_result "offline_orchestration" "FAIL"
+                return 1
+            else
+                log_pass "Execute command responded"
+                record_result "offline_orchestration" "PASS"
+            fi
         fi
     else
-        log_info "No execute command available, skipping"
+        log_skip "No execute command available"
         record_result "offline_orchestration" "SKIP" "false"
     fi
 
@@ -337,8 +369,8 @@ step_cargo_test() {
     cd "$REPO_ROOT"
 
     local test_output
-    # Run tests for aiy-privacy specifically (most comprehensive)
-    if test_output=$(timeout 20m cargo test -p aiy-privacy -- --test-threads=1 2>&1); then
+    # Run workspace tests offline for full-system confidence.
+    if test_output=$(timeout 30m cargo test --workspace --offline -- --test-threads=1 2>&1); then
         local summary
         summary=$(echo "$test_output" | grep -E "^test result:" | head -1)
         echo "  $summary"
@@ -452,9 +484,9 @@ main() {
         exit 1
     fi
 
-    step_privacy_check || true
-    step_enable_disable_sanity || true
     step_temp_repo_init || true
+    step_enable_disable_sanity || true
+    step_privacy_check || true
     step_offline_orchestration_check || true
     step_cargo_test || true
     step_cargo_clippy || true
