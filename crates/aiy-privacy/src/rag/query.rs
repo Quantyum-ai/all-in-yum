@@ -360,23 +360,18 @@ impl Default for QueryBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rag::embedder::{LocalEmbedder, MockEmbeddingTransport};
+    use crate::rag::test_support::TestEmbedder;
     use crate::rag::types::{ChunkType, CodeChunk};
 
     fn create_test_processor() -> QueryProcessor {
-        let transport = Arc::new(MockEmbeddingTransport::deterministic(768));
-        let embedder = Arc::new(LocalEmbedder::with_mock_transport(
-            "http://test",
-            "nomic-embed-text",
-            transport,
-        ));
+        let embedder = Arc::new(TestEmbedder::new(768));
 
         QueryProcessor::new(
             embedder,
             RagConfig {
                 token_budget: 500,
                 top_k: 5,
-                min_similarity: 0.3,
+                min_similarity: 0.0, // Low threshold for bag-of-words sparse embeddings
             },
         )
     }
@@ -416,27 +411,29 @@ mod tests {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
 
-        let mut embedding = Vec::with_capacity(dim);
-        let mut hasher = DefaultHasher::new();
+        let mut buckets = vec![0.0f32; dim];
 
-        for i in 0..dim {
-            hasher.write(text.as_bytes());
-            hasher.write_usize(i);
-            let hash = hasher.finish();
-            let value = ((hash % 2000) as f32 - 1000.0) / 1000.0;
-            embedding.push(value);
-            hasher = DefaultHasher::new();
+        // Bag-of-words: split on non-alphanumeric boundaries, hash each word into a bucket
+        for word in text.split(|c: char| !c.is_alphanumeric()) {
+            if word.is_empty() {
+                continue;
+            }
+            let word_lower = word.to_lowercase();
+            let mut hasher = DefaultHasher::new();
+            word_lower.hash(&mut hasher);
+            let bucket_idx = (hasher.finish() as usize) % dim;
+            buckets[bucket_idx] += 1.0;
         }
 
-        // Normalize
-        let norm: f32 = embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
+        // Normalize to unit length
+        let norm: f32 = buckets.iter().map(|x| x * x).sum::<f32>().sqrt();
         if norm > 0.0 {
-            for x in &mut embedding {
+            for x in &mut buckets {
                 *x /= norm;
             }
         }
 
-        embedding
+        buckets
     }
 
     #[tokio::test]
@@ -479,12 +476,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_token_budget_enforcement() {
-        let transport = Arc::new(MockEmbeddingTransport::deterministic(768));
-        let embedder = Arc::new(LocalEmbedder::with_mock_transport(
-            "http://test",
-            "nomic-embed-text",
-            transport,
-        ));
+        let embedder = Arc::new(TestEmbedder::new(768));
 
         // Very small budget
         let processor = QueryProcessor::new(

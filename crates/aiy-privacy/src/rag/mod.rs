@@ -35,6 +35,8 @@ pub mod error;
 pub mod indexer;
 pub mod query;
 pub mod store;
+#[cfg(test)]
+pub mod test_support;
 pub mod types;
 
 pub use chunk::{chunk_code, ChunkingConfig, ChunkingStrategy};
@@ -347,15 +349,13 @@ pub struct IndexingResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::rag::test_support::TestEmbedder;
 
     fn create_test_rag() -> RagSystem {
-        let config = RagSystemConfig::default();
-        let transport = Arc::new(MockEmbeddingTransport::deterministic(768));
-        let embedder = Arc::new(LocalEmbedder::with_mock_transport(
-            "http://test",
-            "nomic-embed-text",
-            transport,
-        ));
+        let mut config = RagSystemConfig::default();
+        // Lower threshold for bag-of-words sparse embeddings
+        config.rag_config.min_similarity = 0.0;
+        let embedder = Arc::new(TestEmbedder::new(768));
 
         RagSystem::with_mock_embedder(config, embedder)
     }
