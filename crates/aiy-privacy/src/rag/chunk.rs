@@ -133,11 +133,8 @@ fn sliding_window_chunk(content: &str, config: &ChunkingConfig) -> Result<Vec<Co
             .collect();
         line_offset += count_lines(&non_overlap_content) - 1;
 
+        // Always advance by step to guarantee progress
         start += step;
-        if adjusted_end > 0 && start > adjusted_end + start - config.chunk_size {
-            // We adjusted, so account for that
-            start = start.saturating_sub(config.chunk_size - adjusted_end);
-        }
     }
 
     Ok(chunks)
@@ -251,6 +248,40 @@ fn parse_semantic_blocks(content: &str) -> Vec<SemanticBlock> {
         // Check for test attribute
         if test_re.is_match(line) {
             is_test = true;
+        }
+
+        // Handle imports block specially: end on first non-use, non-blank line
+        if in_block && current_block_type == ChunkType::Imports {
+            let is_use_line = use_re.is_match(line);
+            let is_blank = line.trim().is_empty();
+
+            if !is_use_line && !is_blank {
+                // End the imports block before this line
+                let imports_end = i.saturating_sub(1);
+                // Find the last non-blank line in the imports block
+                let mut actual_end = imports_end;
+                while actual_end > current_block_start && lines[actual_end].trim().is_empty() {
+                    actual_end -= 1;
+                }
+
+                if actual_end >= current_block_start {
+                    let block_content: String = lines[current_block_start..=actual_end].join("\n");
+                    if !block_content.trim().is_empty() {
+                        blocks.push(SemanticBlock {
+                            content: block_content,
+                            chunk_type: ChunkType::Imports,
+                            start_line: current_block_start + 1,
+                            end_line: actual_end + 1,
+                        });
+                    }
+                }
+
+                current_block_start = i;
+                current_block_type = ChunkType::CodeBlock;
+                in_block = false;
+                brace_depth = 0;
+                // Don't continue - fall through to check if this line starts a new block
+            }
         }
 
         // Detect block start
@@ -432,16 +463,18 @@ mod tests {
 
     #[test]
     fn test_sliding_window_large_content() {
-        let content = "x".repeat(5000);
+        // Use content with newlines to test realistic chunking behavior
+        let lines: Vec<String> = (0..50).map(|i| format!("line {} content here", i)).collect();
+        let content = lines.join("\n");
         let config = ChunkingConfig {
-            chunk_size: 1000,
-            overlap: 100,
-            max_chunk_size: 2000,
+            chunk_size: 100,
+            overlap: 10,
+            max_chunk_size: 200,
             min_chunk_size: 50,
         };
         let chunks = sliding_window_chunk(&content, &config).unwrap();
 
-        assert!(chunks.len() > 1);
+        assert!(chunks.len() > 1, "Expected multiple chunks for multi-line input with chunk_size=100");
         // Each chunk should be roughly chunk_size
         for chunk in &chunks {
             assert!(chunk.content.len() <= config.max_chunk_size);
