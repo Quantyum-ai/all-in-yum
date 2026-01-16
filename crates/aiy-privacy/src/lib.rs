@@ -108,8 +108,8 @@ pub mod workflow;
 
 // Re-export commonly used types at crate root
 pub use enforcement::{
-    GuardError, GuardMode, PrivacyGuard, PrivacyPolicy, RedactionAudit, RedactionMap, Redactor,
-    Violation, ViolationCategory,
+    GuardError, GuardMode, PrivacyGuard, PrivacyPolicy, RedactionAudit, RedactionKind,
+    RedactionMap, Redactor, Violation, ViolationCategory,
 };
 
 // Re-export RAG types

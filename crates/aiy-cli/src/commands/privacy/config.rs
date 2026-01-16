@@ -230,9 +230,10 @@ pub fn reset_config(repo_root: Option<&Path>) -> anyhow::Result<()> {
 
     // Reset to defaults (preserving enabled state)
     let was_enabled = config.privacy_mode.as_ref().map(|p| p.enabled).unwrap_or(false);
-    let mut default_privacy = PrivacyModeConfig::default();
-    default_privacy.enabled = was_enabled;
-    config.privacy_mode = Some(default_privacy);
+    config.privacy_mode = Some(PrivacyModeConfig {
+        enabled: was_enabled,
+        ..Default::default()
+    });
 
     config.save(&config_path)?;
 

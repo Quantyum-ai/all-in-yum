@@ -113,9 +113,10 @@ impl ClippyStage {
         let code = diagnostic.code.as_ref().map(|c| c.code.clone());
 
         // Look for suggested replacement
-        let suggested_fix = diagnostic.spans.iter().find_map(|span| {
-            span.suggested_replacement.as_ref().map(|s| s.clone())
-        });
+        let suggested_fix = diagnostic
+            .spans
+            .iter()
+            .find_map(|span| span.suggested_replacement.clone());
 
         // Collect related spans
         let related: Vec<RelatedInfo> = diagnostic

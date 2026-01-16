@@ -8,20 +8,15 @@ use thiserror::Error;
 use tracing::{error, warn};
 
 /// Guard action modes
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum GuardMode {
     /// Log violations but allow request (development)
     Warn,
     /// Block request if violations detected (production)
+    #[default]
     Block,
     /// Panic on violations (security audit)
     Panic,
-}
-
-impl Default for GuardMode {
-    fn default() -> Self {
-        GuardMode::Block
-    }
 }
 
 /// Errors from privacy guard enforcement

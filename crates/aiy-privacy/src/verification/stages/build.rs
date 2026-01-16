@@ -2,9 +2,7 @@
 
 use super::{run_cargo_command, VerificationStage};
 use crate::verification::error::VerificationError;
-use crate::verification::types::{
-    CodeLocation, DiagnosticSeverity, FailureType, StageFailure, StageResult,
-};
+use crate::verification::types::{CodeLocation, StageFailure, StageResult};
 use async_trait::async_trait;
 use serde::Deserialize;
 use std::path::Path;

@@ -89,7 +89,7 @@ impl PrivacyPolicy {
                 violations.push(Violation {
                     category: ViolationCategory::SourceCode,
                     pattern_name: name,
-                    description: format!("Source code pattern detected"),
+                    description: "Source code pattern detected".to_string(),
                     position: Some(m.start()),
                 });
             }
@@ -101,7 +101,7 @@ impl PrivacyPolicy {
                 violations.push(Violation {
                     category: ViolationCategory::CodeDiff,
                     pattern_name: name,
-                    description: format!("Code diff detected"),
+                    description: "Code diff detected".to_string(),
                     position: Some(m.start()),
                 });
             }
@@ -113,7 +113,7 @@ impl PrivacyPolicy {
                 violations.push(Violation {
                     category: ViolationCategory::Secret,
                     pattern_name: name,
-                    description: format!("Potential secret detected"),
+                    description: "Potential secret detected".to_string(),
                     position: Some(m.start()),
                 });
             }

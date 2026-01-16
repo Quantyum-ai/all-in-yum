@@ -25,7 +25,7 @@ pub struct PlanTask {
 }
 
 /// Types of tasks that can be executed
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskType {
     /// Create a new file
@@ -43,13 +43,8 @@ pub enum TaskType {
     /// Add documentation
     Document,
     /// Generic task
+    #[default]
     Generic,
-}
-
-impl Default for TaskType {
-    fn default() -> Self {
-        Self::Generic
-    }
 }
 
 /// Result of executing a single task
@@ -189,7 +184,7 @@ impl ExecutionPlan {
             // Detect circular dependencies
             if remaining.len() == before_len && !remaining.is_empty() {
                 // Add remaining tasks in order (circular dep detected)
-                result.extend(remaining.drain(..));
+                result.append(&mut remaining);
             }
         }
 

@@ -39,20 +39,15 @@ impl Default for ChunkingConfig {
 }
 
 /// Strategy for chunking code into segments.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ChunkingStrategy {
     /// Simple sliding window with overlap
     SlidingWindow,
     /// AST-aware chunking (splits on semantic boundaries)
     AstAware,
     /// Hybrid: AST-aware with sliding window fallback
+    #[default]
     Hybrid,
-}
-
-impl Default for ChunkingStrategy {
-    fn default() -> Self {
-        ChunkingStrategy::Hybrid
-    }
 }
 
 /// Chunk source code using the specified strategy.
@@ -115,7 +110,7 @@ fn sliding_window_chunk(content: &str, config: &ChunkingConfig) -> Result<Vec<Co
         let chunk_content: String = chars[start..end].iter().collect();
 
         // Adjust to line boundary if possible
-        let (adjusted_content, adjusted_end) = adjust_to_line_boundary(&chunk_content, end - start);
+        let (adjusted_content, _adjusted_end) = adjust_to_line_boundary(&chunk_content, end - start);
 
         if adjusted_content.len() >= config.min_chunk_size {
             let chunk_lines = count_lines(&adjusted_content);

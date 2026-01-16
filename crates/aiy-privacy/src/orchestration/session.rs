@@ -11,9 +11,10 @@ use std::time::Instant;
 use uuid::Uuid;
 
 /// Session state enum
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SessionState {
     /// Session created but not initialized
+    #[default]
     Created,
     /// Directory indexed, ready to execute
     Ready,
@@ -27,12 +28,6 @@ pub enum SessionState {
     Failed,
     /// Cancelled by user
     Cancelled,
-}
-
-impl Default for SessionState {
-    fn default() -> Self {
-        Self::Created
-    }
 }
 
 impl SessionState {
@@ -244,12 +239,7 @@ impl OrchestrationSession {
     /// Get next task index to execute
     pub fn next_task_index(&self) -> Option<usize> {
         let plan = self.plan.as_ref()?;
-        for i in 0..plan.tasks.len() {
-            if !self.completed_task_indices.contains(&i) {
-                return Some(i);
-            }
-        }
-        None
+        (0..plan.tasks.len()).find(|i| !self.completed_task_indices.contains(i))
     }
 
     /// Check if all tasks are completed

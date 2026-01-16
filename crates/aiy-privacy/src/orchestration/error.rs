@@ -66,6 +66,15 @@ pub enum OrchestrationError {
     /// Cancelled by user
     #[error("Orchestration cancelled")]
     Cancelled,
+
+    /// Operation timed out
+    #[error("Operation '{operation}' timed out after {duration_ms}ms")]
+    Timeout {
+        /// Operation that timed out
+        operation: String,
+        /// Duration in milliseconds
+        duration_ms: u64,
+    },
 }
 
 impl OrchestrationError {

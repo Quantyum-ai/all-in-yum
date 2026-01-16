@@ -6,9 +6,12 @@
 use super::error::VerificationError;
 use super::types::{CodeLocation, FailureType, StageFailure};
 use crate::enforcement::{PrivacyGuard, GuardMode};
-use aiy_adapter_ollama::{OllamaAdapter, OllamaClient};
+use aiy_adapter_ollama::OllamaAdapter;
+#[cfg(test)]
+use aiy_adapter_ollama::OllamaClient;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+#[cfg(test)]
 use std::sync::Arc;
 
 /// Configuration for repair generation.
@@ -498,6 +501,7 @@ mod tests {
     use super::*;
     use aiy_adapter_ollama::transport::MockTransport;
 
+    #[allow(dead_code)] // Kept for future tests
     fn mock_repair_response(code: &str) -> String {
         let escaped = code.replace('"', "\\\"").replace('\n', "\\n");
         format!(

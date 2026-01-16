@@ -17,6 +17,7 @@ use std::time::{Duration, Instant};
 /// lines that need formatting.
 pub struct FmtStage {
     /// Package to check (None for workspace)
+    #[allow(dead_code)] // Reserved for per-package formatting
     package: Option<String>,
     /// Additional rustfmt arguments
     extra_args: Vec<String>,
@@ -46,6 +47,7 @@ impl FmtStage {
     }
 
     /// Build the cargo fmt command arguments.
+    #[allow(dead_code)] // Reserved for per-package formatting
     fn build_args(&self) -> Vec<&str> {
         let mut args = vec!["fmt", "--check"];
 

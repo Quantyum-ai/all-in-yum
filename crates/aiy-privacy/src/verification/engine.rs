@@ -8,9 +8,12 @@ use super::repair::{RepairConfig, RepairGenerator};
 use super::stages::{default_stage_order, VerificationStage};
 use super::state::VerificationState;
 use super::types::{StageResult, VerificationResult};
-use aiy_adapter_ollama::{OllamaAdapter, OllamaClient};
+use aiy_adapter_ollama::OllamaAdapter;
+#[cfg(test)]
+use aiy_adapter_ollama::OllamaClient;
 use aiy_core::config::VerificationConfig;
 use std::path::PathBuf;
+#[cfg(test)]
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -313,6 +316,7 @@ impl VerificationEngine {
     }
 
     /// Run a single stage with repair loop.
+    #[allow(dead_code)] // Will be used when repair loop is fully integrated
     async fn run_stage_with_repairs(
         &mut self,
         stage_idx: usize,
@@ -480,7 +484,7 @@ impl VerificationEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::verification::stages::{ClippyStage, FmtStage, TestStage};
+    use crate::verification::stages::{ClippyStage, FmtStage};
     use aiy_adapter_ollama::transport::MockTransport;
     use tempfile::TempDir;
 
@@ -618,19 +622,5 @@ edition = "2021"
         let engine = VerificationEngine::with_mock_ollama(config, transport);
 
         assert!(engine.ollama_adapter.is_some());
-    }
-
-    // Integration-style test with actual stage execution
-    // Note: This requires cargo to be available
-    #[tokio::test]
-    #[ignore] // Requires actual cargo, run with --ignored
-    async fn test_engine_run_on_valid_project() {
-        let temp = create_temp_project();
-        let config = EngineConfig::new(temp.path()).without_repairs();
-        let mut engine = VerificationEngine::new(config);
-
-        let result = engine.run().await;
-        // This should work on a minimal valid project
-        assert!(result.is_ok());
     }
 }

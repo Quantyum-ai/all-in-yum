@@ -15,6 +15,9 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+/// Type alias for mock embedding response functions.
+type MockResponseFn = Box<dyn Fn(&str) -> Result<String, RagError> + Send + Sync>;
+
 /// Trait for embedding generation.
 ///
 /// This trait allows for different embedding implementations (local, mock, etc.)
@@ -278,7 +281,7 @@ impl EmbeddingTransport for ReqwestEmbeddingTransport {
 /// Mock transport for testing.
 pub struct MockEmbeddingTransport {
     /// Function to generate mock embeddings
-    response_fn: Box<dyn Fn(&str) -> Result<String, RagError> + Send + Sync>,
+    response_fn: MockResponseFn,
 }
 
 impl MockEmbeddingTransport {
@@ -320,6 +323,7 @@ impl MockEmbeddingTransport {
                 // Generate a deterministic embedding based on prompt hash
                 let embedding = generate_deterministic_embedding(prompt, dimension);
 
+                // Match EmbeddingResponse format: {"embedding": [...]} (singular)
                 let response = serde_json::json!({
                     "embedding": embedding
                 });

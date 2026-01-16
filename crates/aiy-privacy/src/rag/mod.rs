@@ -496,7 +496,7 @@ fn multiply(a: i32, b: i32) -> i32 { a * b }
         let temp_dir = std::env::temp_dir();
         let preview = rag.preview_index(&temp_dir);
 
-        // This will vary based on temp dir contents
-        assert!(preview.file_count >= 0);
+        // Verify file_count is a valid usize (existence check - always true since usize)
+        let _ = preview.file_count;
     }
 }

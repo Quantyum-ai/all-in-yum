@@ -276,7 +276,7 @@ pub struct AuditSummary {
 
 impl AuditSummary {
     /// Format as a human-readable summary
-    pub fn to_string(&self) -> String {
+    pub fn display(&self) -> String {
         format!(
             "Privacy audit [{}]: {} redactions, {} unredactions, {} blocked, {} warned ({} events)",
             self.session_hash,
@@ -286,6 +286,12 @@ impl AuditSummary {
             self.violations_warned,
             self.event_count
         )
+    }
+}
+
+impl std::fmt::Display for AuditSummary {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.display())
     }
 }
 

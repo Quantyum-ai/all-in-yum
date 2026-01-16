@@ -21,10 +21,11 @@ use std::path::Path;
 use std::time::SystemTime;
 
 /// Workflow state names
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum WorkflowStateName {
     /// Not yet initialized
+    #[default]
     Uninitialized,
     /// Indexed and ready
     Ready,
@@ -38,12 +39,6 @@ pub enum WorkflowStateName {
     Failed,
     /// Cancelled by user
     Cancelled,
-}
-
-impl Default for WorkflowStateName {
-    fn default() -> Self {
-        Self::Uninitialized
-    }
 }
 
 /// Serializable workflow state

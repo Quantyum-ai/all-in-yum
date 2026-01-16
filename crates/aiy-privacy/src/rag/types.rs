@@ -58,7 +58,7 @@ impl fmt::Display for ChunkId {
 }
 
 /// Type of code chunk, used for chunking strategy selection.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum ChunkType {
     /// A function or method definition
     Function,
@@ -73,6 +73,7 @@ pub enum ChunkType {
     /// Documentation comments
     Documentation,
     /// Generic code block (fallback)
+    #[default]
     CodeBlock,
     /// Test code
     Test,
@@ -91,12 +92,6 @@ impl ChunkType {
             ChunkType::CodeBlock => "code block",
             ChunkType::Test => "test",
         }
-    }
-}
-
-impl Default for ChunkType {
-    fn default() -> Self {
-        ChunkType::CodeBlock
     }
 }
 

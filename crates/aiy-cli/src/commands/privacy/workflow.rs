@@ -6,7 +6,7 @@ use aiy_core::config::PipelineConfig;
 use aiy_privacy::orchestration::{OrchestratorConfig, PrivacyOrchestrator};
 use aiy_privacy::workflow::{WorkflowState, WorkflowStateName};
 use colored::*;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 /// Output format for workflow commands
 #[derive(Debug, Clone, Copy, Default)]

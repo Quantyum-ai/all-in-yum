@@ -821,29 +821,31 @@ mod tests {
         let temp_dir = TempDir::new().expect("Failed to create temp dir");
         let config_path = temp_dir.path().join("privacy_config.toml");
 
-        let mut config = PipelineConfig::default();
-        config.privacy_mode = Some(PrivacyModeConfig {
-            enabled: true,
-            local_executor: LocalExecutorConfig {
-                ollama_url: "http://localhost:11434".to_string(),
-                model: "codellama:13b-instruct".to_string(),
-                context_size: 16384,
-                timeout_ms: 600_000,
-                temperature: 0.2,
-            },
-            rag: RagConfig {
-                token_budget: 4096,
-                top_k: 10,
-                min_similarity: 0.5,
-            },
-            verification: VerificationConfig {
-                max_fmt_repairs: 3,
-                max_clippy_repairs: 3,
-                max_test_repairs: 2,
-                max_global_repairs: 12,
-            },
-            exclude_patterns: vec!["target/**".to_string(), ".git/**".to_string()],
-        });
+        let config = PipelineConfig {
+            privacy_mode: Some(PrivacyModeConfig {
+                enabled: true,
+                local_executor: LocalExecutorConfig {
+                    ollama_url: "http://localhost:11434".to_string(),
+                    model: "codellama:13b-instruct".to_string(),
+                    context_size: 16384,
+                    timeout_ms: 600_000,
+                    temperature: 0.2,
+                },
+                rag: RagConfig {
+                    token_budget: 4096,
+                    top_k: 10,
+                    min_similarity: 0.5,
+                },
+                verification: VerificationConfig {
+                    max_fmt_repairs: 3,
+                    max_clippy_repairs: 3,
+                    max_test_repairs: 2,
+                    max_global_repairs: 12,
+                },
+                exclude_patterns: vec!["target/**".to_string(), ".git/**".to_string()],
+            }),
+            ..Default::default()
+        };
 
         config.save(&config_path).expect("Failed to save config");
         let loaded = PipelineConfig::load(&config_path).expect("Failed to load config");
