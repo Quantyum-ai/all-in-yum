@@ -1,0 +1,147 @@
+# Workflow Status Template
+
+# This tracks progress through BMM methodology Analysis, Planning, and Solutioning phases.
+# Implementation phase is tracked separately in sprint-status.yaml
+
+# STATUS DEFINITIONS:
+# ==================
+# Initial Status (before completion):
+#   - required: Must be completed to progress
+#   - optional: Can be completed but not required
+#   - recommended: Strongly suggested but not required
+#   - conditional: Required only if certain conditions met (e.g., if_has_ui)
+#
+# Completion Status:
+#   - {file-path}: File created/found (e.g., "docs/product-brief.md")
+#   - skipped: Optional/conditional workflow that was skipped
+
+generated: "2026-01-16"
+project: "all-in-yum"
+project_type: "Electron desktop wrapper for aiy CLI"
+selected_track: "enterprise"
+field_type: "greenfield"
+workflow_path: "_bmad/bmm/workflows/workflow-status/paths/enterprise-greenfield.yaml"
+
+# PROJECT CONTEXT AND CONSTRAINTS
+project_notes: |
+  Project: all-in-yum - Electron desktop wrapper for aiy CLI
+
+  The aiy CLI orchestrates multiple AI providers (Claude/Codex/Grok/Gemini)
+  plus a local Ollama executor for privacy mode.
+
+  HARD CONSTRAINT: Preserve privacy boundary
+  - No code/paths/diffs sent to cloud providers
+  - Local Ollama executor ONLY for sensitive operations
+  - Desktop app wraps CLI via process execution/IPC
+  - Rust workspace remains source of truth
+
+  Architecture: New Electron app integrating with existing Rust CLI
+  Key Features: Agent status, credentials, privacy mode, workflows
+
+workflow_status:
+  # ============================================================================
+  # PHASE 0: DISCOVERY (Required for Enterprise)
+  # ============================================================================
+  - phase: 0
+    phase_name: "Discovery"
+    workflows:
+      - id: "brainstorm-project"
+        name: "Brainstorming"
+        status: "_bmad-output/analysis/brainstorming-session-2026-01-16.md"
+        agent: "analyst"
+        command: "/bmad:bmm:workflows:brainstorm-project"
+        note: "Creative exploration: UX patterns, privacy architecture, IPC strategies"
+
+      - id: "research"
+        name: "Research"
+        status: "docs/research-electron-wrapper.md"
+        agent: "analyst"
+        command: "/bmad:bmm:workflows:research"
+        note: |
+          Technical/competitive analysis: Electron security, IPC patterns, credential storage, desktop AI tools.
+          Inputs:
+            - _bmad-output/analysis/brainstorming-session-2026-01-16.md
+            - docs/research-electron-wrapper.md
+          Output:
+            - _bmad-output/analysis/research-takeaways-electron-wrapper.md
+
+      - id: "product-brief"
+        name: "Product Brief"
+        status: "_bmad-output/briefs/product-brief-electron-wrapper.md"
+        agent: "analyst"
+        command: "/bmad:bmm:workflows:create-product-brief"
+        note: "Strategic product planning: vision, users, features, success metrics"
+
+  # ============================================================================
+  # PHASE 1: PLANNING
+  # ============================================================================
+  - phase: 1
+    phase_name: "Planning"
+    workflows:
+      - id: "prd"
+        name: "Product Requirements Document"
+        status: "_bmad-output/prd/prd-electron-wrapper.md"
+        agent: "pm"
+        command: "/bmad:bmm:workflows:create-prd"
+        note: "Enterprise-level requirements with compliance considerations"
+
+      - id: "create-ux-design"
+        name: "UX Design"
+        status: "recommended"
+        agent: "ux-designer"
+        command: "/bmad:bmm:workflows:create-ux-design"
+        note: "Design system and patterns for desktop app"
+
+  # ============================================================================
+  # PHASE 2: SOLUTIONING
+  # ============================================================================
+  - phase: 2
+    phase_name: "Solutioning"
+    workflows:
+      - id: "create-architecture"
+        name: "Architecture"
+        status: "required"
+        agent: "architect"
+        command: "/bmad:bmm:workflows:create-architecture"
+        note: "Enterprise-grade system architecture with privacy-first design"
+
+      - id: "test-design"
+        name: "Test Design"
+        status: "required"
+        agent: "tea"
+        command: "/bmad:bmm:workflows:testarch-test-design"
+        note: "System-level testability review (auto-detects system mode)"
+
+      - id: "validate-architecture"
+        name: "Validate Architecture"
+        status: "recommended"
+        agent: "architect"
+        command: "/bmad:bmm:workflows:validate-architecture"
+        note: "Architecture validation and review"
+
+      - id: "create-epics-and-stories"
+        name: "Create Epics & Stories"
+        status: "required"
+        agent: "pm"
+        command: "/bmad:bmm:workflows:create-epics-and-stories"
+        note: "Break down PRD into implementable epics and stories (requires PRD + UX + Architecture)"
+
+      - id: "implementation-readiness"
+        name: "Implementation Readiness"
+        status: "required"
+        agent: "architect"
+        command: "/bmad:bmm:workflows:implementation-readiness"
+        note: "Validates PRD + Architecture + Epics + UX readiness for implementation"
+
+  # ============================================================================
+  # PHASE 3: IMPLEMENTATION
+  # ============================================================================
+  - phase: 3
+    phase_name: "Implementation"
+    workflows:
+      - id: "sprint-planning"
+        name: "Sprint Planning"
+        status: "required"
+        agent: "sm"
+        command: "/bmad:bmm:workflows:sprint-planning"
+        note: "Creates sprint-status.yaml for implementation tracking"
