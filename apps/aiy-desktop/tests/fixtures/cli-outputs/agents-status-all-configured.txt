@@ -1,0 +1,7 @@
+Agent Credential Status
+=======================
+
+[OK] Grok (xAI) - Ready
+[OK] Claude (Anthropic) - Ready
+
+[OK] 2 of 2 enabled agents ready

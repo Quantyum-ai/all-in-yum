@@ -1,0 +1,13 @@
+Available Agents
+================
+
+ID           Name                      Status     Credentials
+------------------------------------------------------------
+grok         Grok (xAI)               enabled    configured
+claude       Claude (Anthropic)       disabled   missing
+gemini       Gemini (Google)          disabled   missing
+codex        Codex (OpenAI)           disabled   missing
+ollama       Ollama (Local)           enabled    configured
+
+Tip: To enable an agent:  aiy agents enable <id>
+     To set credentials: aiy credentials set <provider>

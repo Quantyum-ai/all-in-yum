@@ -1,0 +1,17 @@
+Privacy Mode Check
+==================
+
+[PASS] Privacy mode: enabled
+[WARN] Ollama URL uses non-standard port: http://127.0.0.1:11435
+
+Ollama Connectivity:
+  [PASS] Ollama server reachable
+  [INFO] Available models:
+    * codellama:7b
+  [WARN] Configured model 'qwen2.5-coder:14b' not available
+    Using fallback: codellama:7b
+  [PASS] Fallback model 'codellama:7b' is available
+
+[INFO] Privacy mode operational with warnings
+
+Summary: 2 warnings, all critical checks passed

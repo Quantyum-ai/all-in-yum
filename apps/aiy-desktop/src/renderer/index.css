@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base styles */
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  body {
+    @apply bg-aiy-background text-aiy-text-primary;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-aiy-background;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-aiy-border rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-aiy-text-muted;
+  }
+}
+
+/* Component styles */
+@layer components {
+  .btn {
+    @apply px-4 py-2 rounded-lg font-medium transition-colors duration-200;
+    @apply focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-aiy-background;
+  }
+
+  .btn-primary {
+    @apply bg-aiy-primary text-white hover:bg-aiy-secondary;
+    @apply focus:ring-aiy-primary;
+  }
+
+  .btn-secondary {
+    @apply bg-aiy-surface text-aiy-text-primary border border-aiy-border;
+    @apply hover:bg-aiy-border;
+    @apply focus:ring-aiy-border;
+  }
+
+  .input {
+    @apply px-3 py-2 rounded-lg bg-aiy-surface border border-aiy-border;
+    @apply text-aiy-text-primary placeholder-aiy-text-muted;
+    @apply focus:outline-none focus:ring-2 focus:ring-aiy-primary focus:border-transparent;
+  }
+
+  .card {
+    @apply bg-aiy-surface border border-aiy-border rounded-lg p-4;
+  }
+}
+
+/* Utility styles */
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}

@@ -1,0 +1,14 @@
+Privacy Mode Check
+==================
+
+[PASS] Privacy mode: enabled
+[PASS] Ollama URL loopback-only: http://127.0.0.1:11434
+
+Ollama Connectivity:
+  [PASS] Ollama server reachable
+  [INFO] Available models:
+    * qwen2.5-coder:14b
+      llama3.1:8b
+  [PASS] Configured model 'qwen2.5-coder:14b' is available
+
+Summary: All checks passed
