@@ -41,14 +41,17 @@ pnpm build
 ### Prerequisites
 
 - Node.js 22.x
-- pnpm 8.x
+- pnpm 9.x
 - Electron 32.x (installed via pnpm)
 
-**Note**: On first `pnpm install`, Electron's postinstall may fail silently. If `pnpm dev` fails with "Electron failed to install correctly", run:
+### Environment Notes
 
-```bash
-node node_modules/.pnpm/electron@32.2.5/node_modules/electron/install.js
-```
+- **Sandboxed Environments**: `pnpm dev` may fail with port binding errors (`listen EPERM :5173`) in restricted environments. This is an OS-level sandbox restriction, not an app issue.
+- **Headless Linux**: GPU warnings are harmless (suppress with `ELECTRON_DISABLE_GPU=1`)
+- **Electron Binary**: On first install, if `pnpm dev` fails with "Electron failed to install correctly", manually run:
+  ```bash
+  node node_modules/.pnpm/electron@32.2.5/node_modules/electron/install.js
+  ```
 
 ---
 

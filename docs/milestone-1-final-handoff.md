@@ -44,6 +44,8 @@ $ rg -n "contextIsolation.*false" src/
 → PASS: No matches found
 ```
 
+Note: Test fixtures and documentation contain example secret patterns (AKIA..., sk-...) but no real credentials.
+
 ### Test Verification
 
 ```bash
@@ -79,6 +81,8 @@ $ pnpm dev
 → ✅ IPC handlers registered
 → ✅ App lifecycle handlers registered
 ```
+
+**Environment Note**: Dev server launch verified on Linux. Sandboxed environments may encounter port binding restrictions (`listen EPERM`).
 
 ---
 

@@ -34,6 +34,8 @@ From PRP Section 4 (Milestone 1 - Walking Skeleton):
 
 **Result**: **4/4 acceptance criteria met**
 
+**Environment Note**: Dev server launch verified on Linux. Sandboxed environments may encounter port binding restrictions (`listen EPERM`).
+
 ---
 
 ## Components Implemented
