@@ -212,8 +212,9 @@ export interface CancelCommandResult {
 export interface ICLIService {
   /**
    * Initialize the service - resolve binary, check version
+   * @param force If true, reinitialize even if already initialized (e.g., when settings change)
    */
-  initialize(): Promise<BinaryResolution>;
+  initialize(force?: boolean): Promise<BinaryResolution>;
 
   /**
    * Run a CLI command

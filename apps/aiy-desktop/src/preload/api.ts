@@ -9,6 +9,14 @@ import { ipcRenderer, IpcRendererEvent } from 'electron';
 import { IPC_CHANNELS, OutputChunk } from '../shared/ipc-channels';
 
 /**
+ * Options for running CLI commands
+ */
+interface CLIRunOptions {
+  /** Repository path to use as working directory */
+  repoPath?: string;
+}
+
+/**
  * CLI API - For running and managing CLI commands
  */
 const cliAPI = {
@@ -16,9 +24,24 @@ const cliAPI = {
    * Run a CLI command
    * @param command - The command to run
    * @param args - Command arguments
+   * @param options - Optional settings including repoPath
    * @returns Job ID for tracking
    */
-  run: (command: string, args: string[]): Promise<string> => {
+  run: (command: string, args: string[], options?: CLIRunOptions): Promise<string> => {
+    if (options?.repoPath) {
+      // Use object format when repoPath is provided
+      return ipcRenderer
+        .invoke(IPC_CHANNELS.CLI_RUN, {
+          command,
+          args,
+          repoPath: options.repoPath,
+        })
+        .then((result) => {
+          // Handle both string (legacy) and object response formats
+          return typeof result === 'string' ? result : result.jobId;
+        });
+    }
+    // Use legacy positional format
     return ipcRenderer.invoke(IPC_CHANNELS.CLI_RUN, command, args);
   },
 
@@ -58,6 +81,20 @@ const cliAPI = {
     return () => {
       ipcRenderer.removeListener(IPC_CHANNELS.CLI_ON_EXIT, handler);
     };
+  },
+
+  /**
+   * Get CLI binary resolution info
+   * @returns Binary path, source, version, and compatibility info
+   */
+  getBinaryInfo: (): Promise<{
+    path: string;
+    source: 'bundled' | 'user-specified' | 'path-lookup';
+    version?: string;
+    compatible: boolean;
+    versionWarning?: string;
+  } | undefined> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.CLI_GET_BINARY_INFO);
   },
 };
 
@@ -123,6 +160,34 @@ const appAPI = {
    */
   getVersion: (): Promise<string> => {
     return ipcRenderer.invoke(IPC_CHANNELS.APP_GET_VERSION);
+  },
+
+  /**
+   * Show native file dialog for selecting a directory
+   * @param options - Dialog options (title, defaultPath)
+   */
+  selectDirectory: (options?: {
+    title?: string;
+    defaultPath?: string;
+  }): Promise<{ cancelled: boolean; path?: string }> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.APP_SELECT_DIRECTORY, options ?? {});
+  },
+
+  /**
+   * Show native file dialog for selecting the CLI binary
+   * @param options - Dialog options (title)
+   */
+  selectCliBinary: (options?: {
+    title?: string;
+  }): Promise<{ cancelled: boolean; path?: string }> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.APP_SELECT_CLI_BINARY, options ?? {});
+  },
+
+  /**
+   * Open logs folder in system file manager
+   */
+  openLogsFolder: (): Promise<{ success: boolean; error?: string }> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.APP_OPEN_LOGS_FOLDER);
   },
 };
 

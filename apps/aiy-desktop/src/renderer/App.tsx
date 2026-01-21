@@ -3,6 +3,7 @@ import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { MainContent } from './components/layout/MainContent';
 import { usePrivacyStore } from './stores/privacy-store';
+import { useRepoStore } from './stores/repo-store';
 
 /**
  * Root Application Component
@@ -14,11 +15,13 @@ import { usePrivacyStore } from './stores/privacy-store';
  */
 function App(): React.ReactElement {
   const { loadPrivacyMode } = usePrivacyStore();
+  const { loadRepoPath } = useRepoStore();
 
-  // Load privacy mode from settings on mount
+  // Load settings from persistent storage on mount
   useEffect(() => {
     loadPrivacyMode();
-  }, [loadPrivacyMode]);
+    loadRepoPath();
+  }, [loadPrivacyMode, loadRepoPath]);
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">

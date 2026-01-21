@@ -32,6 +32,9 @@ const mockElectronAPI = {
     openRepoWindow: vi.fn().mockResolvedValue(undefined),
     openExternal: vi.fn().mockResolvedValue({ success: true }),
     getVersion: vi.fn().mockResolvedValue('0.1.0'),
+    selectDirectory: vi.fn().mockResolvedValue({ cancelled: true }),
+    selectCliBinary: vi.fn().mockResolvedValue({ cancelled: true }),
+    openLogsFolder: vi.fn().mockResolvedValue({ success: true }),
   },
 };
 

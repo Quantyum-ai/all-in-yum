@@ -1,5 +1,6 @@
 import React from 'react';
 import { usePrivacyStore } from '../../stores/privacy-store';
+import { useAppStore } from '../../stores/app-store';
 
 /**
  * Privacy Mode Badge Component
@@ -12,6 +13,7 @@ import { usePrivacyStore } from '../../stores/privacy-store';
  */
 export function PrivacyBadge(): React.ReactElement {
   const { mode, isLoading } = usePrivacyStore();
+  const { setCurrentView } = useAppStore();
 
   // Determine badge styles based on mode
   const isLocal = mode === 'always-local';
@@ -71,6 +73,7 @@ export function PrivacyBadge(): React.ReactElement {
   return (
     <button
       type="button"
+      onClick={() => setCurrentView('privacy')}
       className={`flex items-center gap-2 rounded-full ${badgeColor} px-3 py-1.5 transition-colors hover:opacity-80`}
       title={`Privacy Mode: ${isLocal ? 'Always Local' : 'Hybrid'}\nClick to view details`}
       aria-label={`Privacy mode: ${isLocal ? 'Always Local' : 'Hybrid'}. Click to view details.`}

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useAppStore } from '../../stores/app-store';
 
 interface NavItem {
   id: string;
@@ -87,7 +88,7 @@ const navItems: NavItem[] = [
  * - Bottom section for help/support links
  */
 export function Sidebar(): React.ReactElement {
-  const [activeItem, setActiveItem] = React.useState('dashboard');
+  const { currentView, setCurrentView } = useAppStore();
 
   return (
     <aside className="flex w-60 flex-col border-r border-aiy-border bg-aiy-surface">
@@ -97,15 +98,15 @@ export function Sidebar(): React.ReactElement {
           <button
             key={item.id}
             type="button"
-            onClick={() => setActiveItem(item.id)}
+            onClick={() => setCurrentView(item.id)}
             className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors ${
-              activeItem === item.id
+              currentView === item.id
                 ? 'bg-aiy-primary/10 text-aiy-primary'
                 : 'text-aiy-text-secondary hover:bg-aiy-border/50 hover:text-aiy-text-primary'
             }`}
           >
             <span
-              className={activeItem === item.id ? 'text-aiy-primary' : 'text-aiy-text-muted'}
+              className={currentView === item.id ? 'text-aiy-primary' : 'text-aiy-text-muted'}
             >
               {item.icon}
             </span>

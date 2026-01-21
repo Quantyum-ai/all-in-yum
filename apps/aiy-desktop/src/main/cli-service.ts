@@ -138,7 +138,20 @@ interface InternalJob extends QueuedJob {
    * Resolve the binary path
    */
   private async resolveBinary(): Promise<BinaryResolution> {
-    // Priority 1: User-specified path
+    // Priority 1: User-specified path (from settings or config)
+    const customPath = await this.getCustomBinaryPath();
+    if (customPath) {
+      const exists = await this.checkBinaryExists(customPath);
+      if (exists) {
+        return {
+          path: customPath,
+          source: 'user-specified' as BinarySource,
+          compatible: true,
+        };
+      }
+    }
+
+    // Also check config for custom path (backwards compatibility)
     if (this.config.customBinaryPath) {
       const exists = await this.checkBinaryExists(this.config.customBinaryPath);
       if (exists) {
@@ -150,7 +163,20 @@ interface InternalJob extends QueuedJob {
       }
     }
 
-    // Priority 2: Bundled binary
+    // Priority 2: Cargo build output (workspace root)
+    const cargoBinaryPath = this.getCargoBinaryPath();
+    if (cargoBinaryPath) {
+      const exists = await this.checkBinaryExists(cargoBinaryPath);
+      if (exists) {
+        return {
+          path: cargoBinaryPath,
+          source: 'bundled' as BinarySource, // Treat cargo build as "bundled"
+          compatible: true,
+        };
+      }
+    }
+
+    // Priority 3: Bundled binary (in Electron resources)
     const bundledPath = this.getBundledBinaryPath();
     if (bundledPath) {
       const exists = await this.checkBinaryExists(bundledPath);
@@ -163,7 +189,7 @@ interface InternalJob extends QueuedJob {
       }
     }
 
-    // Priority 3: PATH lookup
+    // Priority 4: PATH lookup
     const pathBinary = await this.findInPath('aiy');
     if (pathBinary) {
       return {
@@ -175,12 +201,16 @@ interface InternalJob extends QueuedJob {
 
     // Fallback: Return fake CLI path for testing (Milestone 1)
     const fakeCLIPath = this.getFakeCLIPath();
-    return {
-      path: fakeCLIPath,
-      source: 'path-lookup' as BinarySource,
-      compatible: true,
-      versionWarning: 'Using fake CLI for testing',
-    };
+    if (fs.existsSync(fakeCLIPath)) {
+      return {
+        path: fakeCLIPath,
+        source: 'path-lookup' as BinarySource,
+        compatible: true,
+        versionWarning: 'Using fake CLI for testing',
+      };
+    }
+
+    throw new Error('No aiy binary found. Please build with cargo or set a custom path.');
   }
 
   /**
@@ -222,6 +252,60 @@ interface InternalJob extends QueuedJob {
   }
 
   /**
+   * Get cargo build output path (workspace root)
+   * This is used during development when the binary is built with cargo
+   */
+  private getCargoBinaryPath(): string | null {
+    // Try to find workspace root by looking for Cargo.toml
+    const possibleRoots = [
+      // From aiy-desktop directory, workspace root is 2 levels up
+      path.resolve(__dirname, '..', '..', '..', '..'),
+      // From process.cwd() if running from workspace root
+      process.cwd(),
+      // Common workspace root for monorepo
+      path.resolve(process.cwd(), '..', '..'),
+    ];
+
+    const binaryName = process.platform === 'win32' ? 'aiy.exe' : 'aiy';
+
+    for (const root of possibleRoots) {
+      const cargoPath = path.join(root, 'Cargo.toml');
+      const debugBinary = path.join(root, 'target', 'debug', binaryName);
+      const releaseBinary = path.join(root, 'target', 'release', binaryName);
+
+      // Check if this looks like the workspace root
+      if (fs.existsSync(cargoPath)) {
+        // Prefer release build if available, otherwise debug
+        if (fs.existsSync(releaseBinary)) {
+          return releaseBinary;
+        }
+        if (fs.existsSync(debugBinary)) {
+          return debugBinary;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Get custom binary path from settings store
+   */
+  private async getCustomBinaryPath(): Promise<string | undefined> {
+    try {
+      // Try to use electron-store to get user settings
+      // This is async to handle cases where store isn't ready
+      const Store = (await import('electron-store')).default;
+      const store = new Store();
+      const customPath = store.get('cliBinaryPath') as string | undefined;
+      return customPath;
+    } catch {
+      // Not in Electron context or store not available
+      return undefined;
+    }
+  }
+
+  /**
    * Check if a binary exists
    */
   private async checkBinaryExists(binaryPath: string): Promise<boolean> {
@@ -254,10 +338,17 @@ interface InternalJob extends QueuedJob {
 
   /**
    * Initialize the CLI service
+   * @param force If true, reinitialize even if already initialized (e.g., when settings change)
    */
-  async initialize(): Promise<BinaryResolution> {
-    if (this.initialized && this.binaryResolution) {
+  async initialize(force = false): Promise<BinaryResolution> {
+    if (!force && this.initialized && this.binaryResolution) {
       return this.binaryResolution;
+    }
+
+    // Reset state if forcing reinitialization
+    if (force) {
+      this.initialized = false;
+      this.binaryResolution = undefined;
     }
 
     // Ensure log directory exists

@@ -142,6 +142,7 @@ function validateSettingsKey(key: unknown): { valid: boolean; error?: string; da
     'defaultTimeoutMs',
     'autoUpdateEnabled',
     'lastUpdateCheck',
+    'lastRepoPath',
     'theme',
     'fontSize',
   ]);
@@ -171,6 +172,18 @@ const store = new Store<AppSettings>({
   defaults: {
     ...DEFAULT_SETTINGS,
   },
+});
+
+// When cliBinaryPath setting changes, reinitialize CLI service
+store.onDidChange('cliBinaryPath', async (newPath) => {
+  console.log(`[Settings] CLI binary path changed to: ${newPath}`);
+  try {
+    // Force reinitialization to pick up the new binary path
+    const binaryInfo = await cliService.initialize(true);
+    console.log(`[Settings] CLI service reinitialized with binary at: ${binaryInfo.path}`);
+  } catch (error) {
+    console.error('[Settings] Failed to reinitialize CLI service:', error);
+  }
 });
 
 // ============================================
