@@ -84,6 +84,10 @@ all-in-yum/
         └── credential_tests.rs
 ```
 
+## References
+
+- [External References](docs/references.md) - Reference projects (not dependencies)
+
 ## Security
 
 **DO NOT commit:**

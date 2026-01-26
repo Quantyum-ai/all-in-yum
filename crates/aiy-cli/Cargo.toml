@@ -1,0 +1,47 @@
+[package]
+name = "aiy-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "CLI for All-in-Yum AI adapter framework"
+
+[[bin]]
+name = "aiy"
+path = "src/main.rs"
+
+[features]
+default = []
+http = ["aiy-adapter-grok/http", "aiy-adapter-claude/http", "aiy-adapter-codex/http", "aiy-adapter-gemini/http", "aiy-adapter-ollama/http", "aiy-privacy/http"]
+
+[dependencies]
+aiy-core = { path = "../aiy-core" }
+aiy-adapters = { path = "../aiy-adapters" }
+aiy-adapter-grok = { path = "../aiy-adapter-grok" }
+aiy-adapter-claude = { path = "../aiy-adapter-claude" }
+aiy-adapter-gemini = { path = "../aiy-adapter-gemini" }
+aiy-adapter-codex = { path = "../aiy-adapter-codex" }
+aiy-adapter-ollama = { path = "../aiy-adapter-ollama" }
+aiy-privacy = { path = "../aiy-privacy" }
+clap.workspace = true
+tokio.workspace = true
+anyhow.workspace = true
+rpassword.workspace = true
+dirs.workspace = true
+colored = "2"
+indicatif = "0.17"
+toml.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono = { version = "0.4", features = ["serde"] }
+regex = "1"
+
+# Integration test that requires the binary
+[[test]]
+name = "cli_smoke_tests"
+path = "tests/cli_smoke_tests.rs"
+
+[dev-dependencies]
+tempfile.workspace = true
+aiy-core = { path = "../aiy-core" }

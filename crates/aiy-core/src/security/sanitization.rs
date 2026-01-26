@@ -138,6 +138,7 @@ static SUSPICIOUS_OUTPUT_PATTERNS: Lazy<Vec<(Regex, &'static str)>> = Lazy::new(
 
 /// Required fields in a review response schema
 const REQUIRED_REVIEW_FIELDS: &[&str] = &[
+    "agent_id",
     "verdict",
     "confidence",
     "issues",
@@ -286,18 +287,20 @@ Respond with a valid JSON object matching this exact schema:
 
 ```json
 {{
-  "verdict": "approve" | "request_changes" | "reject",
+  "agent_id": "grok",
+  "verdict": "pass" | "issue" | "block",
   "confidence": 0.0 to 1.0,
   "issues": [
     {{
-      "severity": "critical" | "major" | "minor" | "suggestion",
-      "location": "file path or line reference",
+      "severity": "critical" | "major" | "minor" | "nit",
+      "category": "category of the issue",
       "description": "description of the issue",
-      "suggestion": "how to fix it"
+      "location": "file path or line reference (optional, can be null)",
+      "suggested_fix": "how to fix it (optional, can be null)"
     }}
   ],
   "suggestions": ["list of general improvement suggestions"],
-  "sign_off": "your reviewer sign-off statement",
+  "sign_off": true | false,
   "reasoning": "explanation of your review decision"
 }}
 ```
@@ -387,11 +390,12 @@ pub fn validate_review_response(response: &str) -> Result<(), SanitizationError>
 /// use aiy_core::security::sanitization::validate_review_schema;
 ///
 /// let valid = json!({
-///     "verdict": "approve",
+///     "agent_id": "test",
+///     "verdict": "pass",
 ///     "confidence": 0.9,
 ///     "issues": [],
 ///     "suggestions": [],
-///     "sign_off": "LGTM",
+///     "sign_off": true,
 ///     "reasoning": "Code looks good"
 /// });
 /// assert!(validate_review_schema(&valid).is_ok());
@@ -417,18 +421,28 @@ pub fn validate_review_schema(json: &serde_json::Value) -> Result<(), Sanitizati
     }
 
     // Validate field types
+    validate_field_type(obj, "agent_id", |v| v.is_string())?;
     validate_field_type(obj, "verdict", |v| v.is_string())?;
     validate_field_type(obj, "confidence", |v| v.is_f64() || v.is_i64())?;
     validate_field_type(obj, "issues", |v| v.is_array())?;
     validate_field_type(obj, "suggestions", |v| v.is_array())?;
-    validate_field_type(obj, "sign_off", |v| v.is_string())?;
+    validate_field_type(obj, "sign_off", |v| v.is_boolean())?;
     validate_field_type(obj, "reasoning", |v| v.is_string())?;
+
+    // Validate agent_id is non-empty
+    if let Some(agent_id) = obj.get("agent_id").and_then(|v| v.as_str()) {
+        if agent_id.is_empty() {
+            return Err(SanitizationError::InvalidSchema(
+                "agent_id must be a non-empty string".to_string(),
+            ));
+        }
+    }
 
     // Validate verdict value
     if let Some(verdict) = obj.get("verdict").and_then(|v| v.as_str()) {
-        if !["approve", "request_changes", "reject"].contains(&verdict) {
+        if !["pass", "issue", "block"].contains(&verdict) {
             return Err(SanitizationError::InvalidSchema(format!(
-                "Invalid verdict '{}': must be 'approve', 'request_changes', or 'reject'",
+                "Invalid verdict '{}': must be 'pass', 'issue', or 'block'",
                 verdict
             )));
         }
@@ -444,6 +458,93 @@ pub fn validate_review_schema(json: &serde_json::Value) -> Result<(), Sanitizati
                 "Confidence {} out of range: must be between 0.0 and 1.0",
                 conf_value
             )));
+        }
+    }
+
+    // Validate issues array elements (if non-empty)
+    if let Some(issues) = obj.get("issues").and_then(|v| v.as_array()) {
+        for (i, issue) in issues.iter().enumerate() {
+            let issue_obj = issue.as_object().ok_or_else(|| {
+                SanitizationError::InvalidSchema(format!("issues[{}] must be an object", i))
+            })?;
+
+            // Required fields: severity, category, description
+            if !issue_obj.contains_key("severity") {
+                return Err(SanitizationError::InvalidSchema(format!(
+                    "issues[{}] missing required field 'severity'",
+                    i
+                )));
+            }
+            if !issue_obj.contains_key("category") {
+                return Err(SanitizationError::InvalidSchema(format!(
+                    "issues[{}] missing required field 'category'",
+                    i
+                )));
+            }
+            if !issue_obj.contains_key("description") {
+                return Err(SanitizationError::InvalidSchema(format!(
+                    "issues[{}] missing required field 'description'",
+                    i
+                )));
+            }
+
+            // Validate severity enum
+            if let Some(severity) = issue_obj.get("severity").and_then(|v| v.as_str()) {
+                if !["critical", "major", "minor", "nit"].contains(&severity) {
+                    return Err(SanitizationError::InvalidSchema(format!(
+                        "issues[{}] has invalid severity '{}': must be 'critical', 'major', 'minor', or 'nit'",
+                        i, severity
+                    )));
+                }
+            } else {
+                return Err(SanitizationError::InvalidSchema(format!(
+                    "issues[{}] field 'severity' must be a string",
+                    i
+                )));
+            }
+
+            // Validate category is string
+            if !issue_obj
+                .get("category")
+                .map(|v| v.is_string())
+                .unwrap_or(false)
+            {
+                return Err(SanitizationError::InvalidSchema(format!(
+                    "issues[{}] field 'category' must be a string",
+                    i
+                )));
+            }
+
+            // Validate description is string
+            if !issue_obj
+                .get("description")
+                .map(|v| v.is_string())
+                .unwrap_or(false)
+            {
+                return Err(SanitizationError::InvalidSchema(format!(
+                    "issues[{}] field 'description' must be a string",
+                    i
+                )));
+            }
+
+            // Optional fields: location (string|null), suggested_fix (string|null)
+            if let Some(location) = issue_obj.get("location") {
+                if !location.is_string() && !location.is_null() {
+                    return Err(SanitizationError::InvalidSchema(format!(
+                        "issues[{}] field 'location' must be a string or null",
+                        i
+                    )));
+                }
+            }
+
+            if let Some(suggested_fix) = issue_obj.get("suggested_fix") {
+                if !suggested_fix.is_string() && !suggested_fix.is_null() {
+                    return Err(SanitizationError::InvalidSchema(format!(
+                        "issues[{}] field 'suggested_fix' must be a string or null",
+                        i
+                    )));
+                }
+            }
         }
     }
 
@@ -669,7 +770,7 @@ fn main() {
 
         #[test]
         fn test_accepts_valid_json_response() {
-            let response = r#"{"verdict": "approve", "confidence": 0.9}"#;
+            let response = r#"{"agent_id": "test", "verdict": "pass", "confidence": 0.9}"#;
             assert!(validate_review_response(response).is_ok());
         }
 
@@ -715,11 +816,12 @@ fn main() {
         #[test]
         fn test_accepts_normal_review() {
             let response = r#"{
-                "verdict": "approve",
+                "agent_id": "test",
+                "verdict": "pass",
                 "confidence": 0.95,
                 "issues": [],
                 "suggestions": ["Consider adding more tests"],
-                "sign_off": "LGTM",
+                "sign_off": true,
                 "reasoning": "Code follows best practices"
             }"#;
             assert!(validate_review_response(response).is_ok());
@@ -732,11 +834,12 @@ fn main() {
         #[test]
         fn test_accepts_valid_schema() {
             let json = json!({
-                "verdict": "approve",
+                "agent_id": "test",
+                "verdict": "pass",
                 "confidence": 0.9,
                 "issues": [],
                 "suggestions": [],
-                "sign_off": "LGTM",
+                "sign_off": true,
                 "reasoning": "All good"
             });
             assert!(validate_review_schema(&json).is_ok());
@@ -745,10 +848,11 @@ fn main() {
         #[test]
         fn test_rejects_missing_verdict() {
             let json = json!({
+                "agent_id": "test",
                 "confidence": 0.9,
                 "issues": [],
                 "suggestions": [],
-                "sign_off": "LGTM",
+                "sign_off": true,
                 "reasoning": "All good"
             });
             let result = validate_review_schema(&json);
@@ -759,10 +863,11 @@ fn main() {
         #[test]
         fn test_rejects_missing_confidence() {
             let json = json!({
-                "verdict": "approve",
+                "agent_id": "test",
+                "verdict": "pass",
                 "issues": [],
                 "suggestions": [],
-                "sign_off": "LGTM",
+                "sign_off": true,
                 "reasoning": "All good"
             });
             let result = validate_review_schema(&json);
@@ -772,11 +877,12 @@ fn main() {
         #[test]
         fn test_rejects_invalid_verdict_value() {
             let json = json!({
+                "agent_id": "test",
                 "verdict": "maybe",
                 "confidence": 0.9,
                 "issues": [],
                 "suggestions": [],
-                "sign_off": "LGTM",
+                "sign_off": true,
                 "reasoning": "All good"
             });
             let result = validate_review_schema(&json);
@@ -786,11 +892,12 @@ fn main() {
         #[test]
         fn test_rejects_confidence_out_of_range() {
             let json = json!({
-                "verdict": "approve",
+                "agent_id": "test",
+                "verdict": "pass",
                 "confidence": 1.5,
                 "issues": [],
                 "suggestions": [],
-                "sign_off": "LGTM",
+                "sign_off": true,
                 "reasoning": "All good"
             });
             let result = validate_review_schema(&json);
@@ -807,11 +914,12 @@ fn main() {
         #[test]
         fn test_rejects_wrong_field_types() {
             let json = json!({
+                "agent_id": "test",
                 "verdict": 123,
                 "confidence": 0.9,
                 "issues": [],
                 "suggestions": [],
-                "sign_off": "LGTM",
+                "sign_off": true,
                 "reasoning": "All good"
             });
             let result = validate_review_schema(&json);
@@ -821,18 +929,20 @@ fn main() {
         #[test]
         fn test_accepts_issues_as_array() {
             let json = json!({
-                "verdict": "request_changes",
+                "agent_id": "test",
+                "verdict": "issue",
                 "confidence": 0.8,
                 "issues": [
                     {
                         "severity": "major",
-                        "location": "line 42",
+                        "category": "null-safety",
                         "description": "Potential null pointer",
-                        "suggestion": "Add null check"
+                        "location": "line 42",
+                        "suggested_fix": "Add null check"
                     }
                 ],
                 "suggestions": [],
-                "sign_off": "Needs work",
+                "sign_off": false,
                 "reasoning": "Found issues"
             });
             assert!(validate_review_schema(&json).is_ok());
@@ -841,11 +951,12 @@ fn main() {
         #[test]
         fn test_accepts_integer_confidence() {
             let json = json!({
-                "verdict": "approve",
+                "agent_id": "test",
+                "verdict": "pass",
                 "confidence": 1,
                 "issues": [],
                 "suggestions": [],
-                "sign_off": "LGTM",
+                "sign_off": true,
                 "reasoning": "All good"
             });
             assert!(validate_review_schema(&json).is_ok());

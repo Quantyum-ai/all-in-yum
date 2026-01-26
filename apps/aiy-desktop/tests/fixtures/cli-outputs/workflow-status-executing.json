@@ -1,0 +1,15 @@
+{
+  "state": "executing",
+  "created_at": 1705680000,
+  "updated_at": 1705680150,
+  "total_tasks": 5,
+  "tasks_completed": 2,
+  "tasks_failed": 0,
+  "total_repairs": 1,
+  "files_modified_count": 3,
+  "chunks_indexed": 150,
+  "cloud_requests": 1,
+  "local_executions": 2,
+  "duration_ms": 15000,
+  "error_message": null
+}

@@ -1,0 +1,14 @@
+Privacy Mode Check
+==================
+
+[PASS] Privacy mode: enabled
+[PASS] Ollama URL loopback-only: http://127.0.0.1:11434
+
+Ollama Connectivity:
+  [FAIL] Ollama server not reachable
+    Error: Connection refused (os error 111)
+  [SKIP] Model availability check skipped (server unreachable)
+
+[FAIL] Cannot proceed with privacy mode - Ollama is required
+
+Summary: 2 checks failed

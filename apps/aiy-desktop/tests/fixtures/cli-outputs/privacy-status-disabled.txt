@@ -1,0 +1,9 @@
+Privacy Mode Status
+===================
+
+Status: [DISABLED]
+
+Privacy mode is not enabled. Cloud AI operations are available.
+
+To enable privacy mode:
+  aiy privacy enable --ollama-url http://127.0.0.1:11434 --model qwen2.5-coder:14b

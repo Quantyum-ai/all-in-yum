@@ -1,0 +1,1487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>aiy Desktop - UX Design Directions</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            padding: 24px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: white;
+            padding: 32px;
+            border-radius: 12px;
+            margin-bottom: 32px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        header h1 {
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: #1a1a1a;
+        }
+
+        header p {
+            font-size: 18px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        .instructions {
+            background: #e3f2fd;
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 16px;
+            border-left: 4px solid #2196f3;
+        }
+
+        .instructions strong {
+            color: #1565c0;
+        }
+
+        .directions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(800px, 1fr));
+            gap: 32px;
+            margin-bottom: 48px;
+        }
+
+        .direction-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .direction-header {
+            padding: 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .direction-header h2 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .direction-header p {
+            font-size: 16px;
+            opacity: 0.95;
+        }
+
+        .direction-body {
+            padding: 24px;
+        }
+
+        .mockup-container {
+            background: #f8f9fa;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            border: 2px solid #dee2e6;
+        }
+
+        .mockup-window {
+            background: #ffffff;
+            min-height: 600px;
+        }
+
+        /* Window Chrome */
+        .window-chrome {
+            height: 40px;
+            background: #f1f3f4;
+            border-bottom: 1px solid #dadce0;
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            gap: 8px;
+        }
+
+        .window-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .window-button {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ccc;
+        }
+
+        .window-button.close { background: #ff5f57; }
+        .window-button.minimize { background: #ffbd2e; }
+        .window-button.maximize { background: #28ca42; }
+
+        /* Layout Structures */
+        .app-layout {
+            display: flex;
+            height: 560px;
+        }
+
+        .app-header {
+            height: 48px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            justify-content: space-between;
+            background: white;
+        }
+
+        .sidebar {
+            width: 192px;
+            background: #f9fafb;
+            border-right: 1px solid #e5e7eb;
+            padding: 16px 0;
+        }
+
+        .main-content {
+            flex: 1;
+            overflow-y: auto;
+            background: white;
+        }
+
+        .content-inner {
+            padding: 24px;
+            max-width: 1200px;
+        }
+
+        /* Components */
+        .nav-item {
+            padding: 10px 16px;
+            margin: 4px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #374151;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .nav-item:hover {
+            background: #e5e7eb;
+        }
+
+        .nav-item.active {
+            background: #dbeafe;
+            color: #1e40af;
+            font-weight: 600;
+        }
+
+        .privacy-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .privacy-badge.local {
+            background: #dcfce7;
+            color: #16a34a;
+        }
+
+        .privacy-badge.hybrid {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        .shield-icon {
+            width: 14px;
+            height: 14px;
+        }
+
+        .workflow-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .workflow-card:hover {
+            border-color: #3b82f6;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+        }
+
+        .workflow-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 4px;
+        }
+
+        .workflow-desc {
+            font-size: 14px;
+            color: #6b7280;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-badge.running {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .status-badge.idle {
+            background: #f3f4f6;
+            color: #6b7280;
+        }
+
+        .status-badge.paused {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 6px;
+            border: none;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2563eb;
+        }
+
+        .command-palette {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+            z-index: 100;
+        }
+
+        .palette-input {
+            width: 100%;
+            padding: 16px 20px;
+            border: none;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .palette-input:focus-visible {
+            outline: 2px solid #3b82f6;
+            outline-offset: -2px;
+        }
+
+        .palette-results {
+            padding: 8px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .palette-item {
+            padding: 12px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .palette-item:hover {
+            background: #f3f4f6;
+        }
+
+        .log-entry {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-size: 13px;
+        }
+
+        .log-timestamp {
+            color: #6b7280;
+            margin-right: 12px;
+        }
+
+        .log-level {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-right: 12px;
+        }
+
+        .log-level.info { background: #dbeafe; color: #1e40af; }
+        .log-level.error { background: #fee2e2; color: #dc2626; }
+        .log-level.warn { background: #fef3c7; color: #d97706; }
+
+        .privacy-modal {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            width: 600px;
+            z-index: 100;
+        }
+
+        .modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #111827;
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid #e5e7eb;
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        .code-block {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 16px;
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-size: 13px;
+            margin: 16px 0;
+            overflow-x: auto;
+        }
+
+        .key-features {
+            margin-top: 20px;
+        }
+
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .feature-list li {
+            padding: 8px 0;
+            padding-left: 24px;
+            position: relative;
+        }
+
+        .feature-list li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #16a34a;
+            font-weight: bold;
+        }
+
+        .strengths-weaknesses {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-top: 20px;
+        }
+
+        .strength, .weakness {
+            padding: 16px;
+            border-radius: 8px;
+        }
+
+        .strength {
+            background: #dcfce7;
+            border-left: 4px solid #16a34a;
+        }
+
+        .weakness {
+            background: #fee2e2;
+            border-left: 4px solid #dc2626;
+        }
+
+        .strength h4, .weakness h4 {
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .strength ul, .weakness ul {
+            font-size: 13px;
+            padding-left: 20px;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin: 20px 0;
+        }
+
+        .dashboard-card {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .dashboard-card h3 {
+            font-size: 14px;
+            color: #6b7280;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .dashboard-card .value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #111827;
+        }
+
+        .floating-privacy {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            z-index: 50;
+        }
+
+        /* Direction-specific color schemes */
+        .direction-a .app-header { background: linear-gradient(to right, #dcfce7, #f0fdf4); }
+        .direction-a .nav-item.active { background: #dcfce7; color: #15803d; }
+
+        .direction-b .sidebar { background: #eff6ff; }
+        .direction-b .nav-item.active { background: #dbeafe; color: #1e40af; }
+
+        .direction-c .command-palette { display: block; }
+
+        .direction-d .sidebar { background: #1e1e1e; }
+        .direction-d .nav-item { color: #cccccc; }
+        .direction-d .nav-item.active { background: #37373d; color: #ffffff; }
+
+        .direction-e .dashboard-grid { display: grid; }
+
+        .direction-f .log-entry { background: rgba(0,0,0,0.02); margin-bottom: 1px; }
+
+        /* Accessibility: Respect user motion preferences */
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>aiy Desktop - UX Design Directions</h1>
+            <p>6 design direction explorations for the Electron wrapper</p>
+            <p style="margin-top: 8px;"><strong>Project:</strong> aiy Desktop | <strong>Platform:</strong> Electron (macOS, Windows, Linux) | <strong>Design System:</strong> shadcn/ui + Tailwind CSS</p>
+
+            <div class="instructions">
+                <strong>Instructions:</strong> Below are 6 different design direction mockups. Each demonstrates the same 5 core screens (Workflows, Agents, Credentials, Privacy Mode, Logs) with different visual and interaction approaches. Compare how each direction handles privacy indicators, workflow execution, and keyboard-first navigation. Scroll through all 6 to find which direction best aligns with our "Trust + Speed" UX goal.
+            </div>
+        </header>
+
+        <div class="directions-grid">
+            <!-- DIRECTION A: Privacy-First -->
+            <div class="direction-card">
+                <div class="direction-header" style="background: linear-gradient(135deg, #16a34a 0%, #059669 100%);">
+                    <h2>Direction A: Privacy-First</h2>
+                    <p>Maximum trust through constant visual reassurance</p>
+                </div>
+                <div class="direction-body">
+                    <div class="mockup-container">
+                        <div class="mockup-window direction-a">
+                            <div class="window-chrome">
+                                <div class="window-buttons">
+                                    <div class="window-button close"></div>
+                                    <div class="window-button minimize"></div>
+                                    <div class="window-button maximize"></div>
+                                </div>
+                            </div>
+
+                            <div class="app-header">
+                                <div style="display: flex; align-items: center; gap: 16px;">
+                                    <div style="font-weight: 600; color: #111827;">~/projects/my-app</div>
+                                    <span class="privacy-badge local">
+                                        <svg class="shield-icon" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944zM11 14a1 1 0 11-2 0 1 1 0 012 0zm0-7a1 1 0 10-2 0v3a1 1 0 102 0V7z" clip-rule="evenodd"/>
+                                        </svg>
+                                        Always Local
+                                    </span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <span style="font-size: 13px; color: #16a34a; font-weight: 600;">● Ollama Running</span>
+                                    <button class="btn btn-primary">⚙️ Settings</button>
+                                </div>
+                            </div>
+
+                            <div class="app-layout">
+                                <div class="sidebar">
+                                    <div class="nav-item active">
+                                        <span>📋</span> Workflows
+                                    </div>
+                                    <div class="nav-item">
+                                        <span>🤖</span> Agents
+                                    </div>
+                                    <div class="nav-item">
+                                        <span>🔑</span> Credentials
+                                    </div>
+                                    <div class="nav-item">
+                                        <span>🔒</span> Privacy Mode
+                                    </div>
+                                    <div class="nav-item">
+                                        <span>📝</span> Logs
+                                    </div>
+                                </div>
+
+                                <div class="main-content">
+                                    <div class="content-inner">
+                                        <div style="background: #dcfce7; border: 2px solid #16a34a; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+                                            <div style="display: flex; align-items: start; gap: 12px;">
+                                                <svg width="24" height="24" fill="#16a34a" viewBox="0 0 20 20">
+                                                    <path fill-rule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944zM11 14a1 1 0 11-2 0 1 1 0 012 0zm0-7a1 1 0 10-2 0v3a1 1 0 102 0V7z" clip-rule="evenodd"/>
+                                                </svg>
+                                                <div>
+                                                    <div style="font-weight: 700; color: #15803d; margin-bottom: 4px;">Privacy Verified</div>
+                                                    <div style="font-size: 14px; color: #166534;">All workflows will run locally. No code or paths will leave your machine.</div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 16px;">Available Workflows</h2>
+
+                                        <div class="workflow-card">
+                                            <div style="display: flex; justify-content: space-between; align-items: start;">
+                                                <div>
+                                                    <div class="workflow-title">create-feature</div>
+                                                    <div class="workflow-desc">Scaffold a new feature with boilerplate and tests</div>
+                                                </div>
+                                                <span class="status-badge idle">Idle</span>
+                                            </div>
+                                        </div>
+
+                                        <div class="workflow-card">
+                                            <div style="display: flex; justify-content: space-between; align-items: start;">
+                                                <div>
+                                                    <div class="workflow-title">fix-bug</div>
+                                                    <div class="workflow-desc">Analyze and fix reported bugs with root cause analysis</div>
+                                                </div>
+                                                <span class="status-badge paused">Paused</span>
+                                            </div>
+                                        </div>
+
+                                        <div class="workflow-card">
+                                            <div style="display: flex; justify-content: space-between; align-items: start;">
+                                                <div>
+                                                    <div class="workflow-title">refactor-component</div>
+                                                    <div class="workflow-desc">Improve code structure and maintainability</div>
+                                                </div>
+                                                <span class="status-badge idle">Idle</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="key-features">
+                        <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 12px;">Key Features</h3>
+                        <ul class="feature-list">
+                            <li>Privacy badge always visible in header with shield icon</li>
+                            <li>Green color scheme reinforces "safe" feeling throughout</li>
+                            <li>Large privacy verification banner at top of every screen</li>
+                            <li>Status indicators use green (local) / amber (hybrid) consistently</li>
+                            <li>Privacy Mode screen prominent in navigation</li>
+                        </ul>
+                    </div>
+
+                    <div class="strengths-weaknesses">
+                        <div class="strength">
+                            <h4>Strengths</h4>
+                            <ul>
+                                <li>Maximum trust signaling</li>
+                                <li>Clear for security-conscious users (Alex persona)</li>
+                                <li>Visual consistency around privacy</li>
+                            </ul>
+                        </div>
+                        <div class="weakness">
+                            <h4>Trade-offs</h4>
+                            <ul>
+                                <li>Privacy messaging may feel redundant to power users</li>
+                                <li>Green color scheme limits flexibility</li>
+                                <li>Banner takes valuable screen space</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DIRECTION B: Workflow-Centric -->
+            <div class="direction-card">
+                <div class="direction-header" style="background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);">
+                    <h2>Direction B: Workflow-Centric</h2>
+                    <p>Fast execution with workflow cards as heroes</p>
+                </div>
+                <div class="direction-body">
+                    <div class="mockup-container">
+                        <div class="mockup-window direction-b">
+                            <div class="window-chrome">
+                                <div class="window-buttons">
+                                    <div class="window-button close"></div>
+                                    <div class="window-button minimize"></div>
+                                    <div class="window-button maximize"></div>
+                                </div>
+                            </div>
+
+                            <div class="app-header">
+                                <div style="display: flex; align-items: center; gap: 16px;">
+                                    <div style="font-weight: 600; color: #111827;">~/projects/my-app</div>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <span class="privacy-badge local">
+                                        <svg class="shield-icon" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944zM11 14a1 1 0 11-2 0 1 1 0 012 0zm0-7a1 1 0 10-2 0v3a1 1 0 102 0V7z" clip-rule="evenodd"/>
+                                        </svg>
+                                        Local
+                                    </span>
+                                    <span style="font-size: 13px; color: #16a34a; font-weight: 600;">● Ollama</span>
+                                    <button class="btn btn-primary">⚙️</button>
+                                </div>
+                            </div>
+
+                            <div class="app-layout">
+                                <div class="sidebar">
+                                    <div class="nav-item active">
+                                        <span>📋</span> Workflows
+                                    </div>
+                                    <div class="nav-item">
+                                        <span>🤖</span> Agents
+                                    </div>
+                                    <div class="nav-item">
+                                        <span>🔑</span> Credentials
+                                    </div>
+                                    <div class="nav-item">
+                                        <span>🔒</span> Privacy
+                                    </div>
+                                    <div class="nav-item">
+                                        <span>📝</span> Logs
+                                    </div>
+                                </div>
+
+                                <div class="main-content">
+                                    <div class="content-inner">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                                            <h2 style="font-size: 24px; font-weight: 700;">Workflows</h2>
+                                            <button class="btn btn-primary">⌨️ Cmd+K to search</button>
+                                        </div>
+
+                                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 16px;">
+                                            <div style="border: 2px solid #3b82f6; border-radius: 12px; padding: 20px; background: linear-gradient(to bottom right, #eff6ff, #ffffff); cursor: pointer;">
+                                                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+                                                    <div style="font-size: 20px; font-weight: 700; color: #1e40af;">create-feature</div>
+                                                    <span class="status-badge idle">Idle</span>
+                                                </div>
+                                                <div style="color: #6b7280; margin-bottom: 16px;">Scaffold a new feature with boilerplate and tests</div>
+                                                <button class="btn btn-primary" style="width: 100%;">Execute (⌘⇧E)</button>
+                                            </div>
+
+                                            <div style="border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; cursor: pointer;">
+                                                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+                                                    <div style="font-size: 20px; font-weight: 700; color: #111827;">fix-bug</div>
+                                                    <span class="status-badge idle">Idle</span>
+                                                </div>
+                                                <div style="color: #6b7280; margin-bottom: 16px;">Analyze and fix reported bugs with root cause analysis</div>
+                                                <button class="btn btn-primary" style="width: 100%;">Execute (⌘⇧E)</button>
+                                            </div>
+
+                                            <div style="border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; cursor: pointer;">
+                                                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+                                                    <div style="font-size: 20px; font-weight: 700; color: #111827;">refactor-component</div>
+                                                    <span class="status-badge idle">Idle</span>
+                                                </div>
+                                                <div style="color: #6b7280; margin-bottom: 16px;">Improve code structure and maintainability</div>
+                                                <button class="btn btn-primary" style="width: 100%;">Execute (⌘⇧E)</button>
+                                            </div>
+
+                                            <div style="border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; cursor: pointer;">
+                                                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+                                                    <div style="font-size: 20px; font-weight: 700; color: #111827;">write-tests</div>
+                                                    <span class="status-badge idle">Idle</span>
+                                                </div>
+                                                <div style="color: #6b7280; margin-bottom: 16px;">Generate comprehensive test coverage</div>
+                                                <button class="btn btn-primary" style="width: 100%;">Execute (⌘⇧E)</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="key-features">
+                        <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 12px;">Key Features</h3>
+                        <ul class="feature-list">
+                            <li>Large workflow cards with prominent Execute buttons</li>
+                            <li>Grid layout optimizes space for scanning options</li>
+                            <li>Privacy badge compact in header (trusted baseline)</li>
+                            <li>Keyboard shortcuts visible on cards and buttons</li>
+                            <li>Visual hierarchy: active/selected workflows stand out</li>
+                        </ul>
+                    </div>
+
+                    <div class="strengths-weaknesses">
+                        <div class="strength">
+                            <h4>Strengths</h4>
+                            <ul>
+                                <li>Fast scanning of workflow options</li>
+                                <li>Clear call-to-action (Execute buttons)</li>
+                                <li>Good for power users (Jordan persona)</li>
+                                <li>Efficient use of screen space</li>
+                            </ul>
+                        </div>
+                        <div class="weakness">
+                            <h4>Trade-offs</h4>
+                            <ul>
+                                <li>Privacy less emphasized than Direction A</li>
+                                <li>May feel crowded with many workflows</li>
+                                <li>Requires scrolling with 10+ workflows</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DIRECTION C: Command Palette Native -->
+            <div class="direction-card">
+                <div class="direction-header" style="background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);">
+                    <h2>Direction C: Command Palette Native</h2>
+                    <p>Keyboard-first with omnipresent command palette</p>
+                </div>
+                <div class="direction-body">
+                    <div class="mockup-container">
+                        <div class="mockup-window direction-c" style="position: relative;">
+                            <div class="window-chrome">
+                                <div class="window-buttons">
+                                    <div class="window-button close"></div>
+                                    <div class="window-button minimize"></div>
+                                    <div class="window-button maximize"></div>
+                                </div>
+                            </div>
+
+                            <!-- Command Palette Overlay -->
+                            <div class="command-palette">
+                                <input type="text" class="palette-input" placeholder="Type a command or search... (Cmd+K)" value="create">
+                                <div class="palette-results">
+                                    <div class="palette-item" style="background: #f3f4f6;">
+                                        <span style="font-size: 20px;">📋</span>
+                                        <div style="flex: 1;">
+                                            <div style="font-weight: 600; color: #111827;">Execute: create-feature</div>
+                                            <div style="font-size: 13px; color: #6b7280;">Scaffold a new feature with boilerplate and tests</div>
+                                        </div>
+                                        <kbd style="background: #e5e7eb; padding: 4px 8px; border-radius: 4px; font-size: 11px;">⌘⇧E</kbd>
+                                    </div>
+                                    <div class="palette-item">
+                                        <span style="font-size: 20px;">🤖</span>
+                                        <div style="flex: 1;">
+                                            <div style="font-weight: 600; color: #111827;">Agent: create-agent</div>
+                                            <div style="font-size: 13px; color: #6b7280;">Customize AI agent for specific tasks</div>
+                                        </div>
+                                    </div>
+                                    <div class="palette-item">
+                                        <span style="font-size: 20px;">📝</span>
+                                        <div style="flex: 1;">
+                                            <div style="font-weight: 600; color: #111827;">View Logs: create</div>
+                                            <div style="font-size: 13px; color: #6b7280;">Filter logs containing "create"</div>
+                                        </div>
+                                        <kbd style="background: #e5e7eb; padding: 4px 8px; border-radius: 4px; font-size: 11px;">⌘5</kbd>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="app-header">
+                                <div style="display: flex; align-items: center; gap: 16px;">
+                                    <div style="font-weight: 600; color: #111827;">~/projects/my-app</div>
+                                    <div style="background: #f3f4f6; padding: 8px 16px; border-radius: 6px; border: 1px solid #e5e7eb; font-size: 14px; color: #6b7280;">
+                                        Press <kbd style="background: #e5e7eb; padding: 2px 6px; border-radius: 4px; font-weight: 600;">⌘K</kbd> to open command palette
+                                    </div>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <span class="privacy-badge local">
+                                        <svg class="shield-icon" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944zM11 14a1 1 0 11-2 0 1 1 0 012 0zm0-7a1 1 0 10-2 0v3a1 1 0 102 0V7z" clip-rule="evenodd"/>
+                                        </svg>
+                                        Local
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="app-layout">
+                                <div class="sidebar">
+                                    <div class="nav-item">
+                                        <span>📋</span> Workflows <kbd style="font-size: 11px; color: #9ca3af;">⌘1</kbd>
+                                    </div>
+                                    <div class="nav-item">
+                                        <span>🤖</span> Agents <kbd style="font-size: 11px; color: #9ca3af;">⌘2</kbd>
+                                    </div>
+                                    <div class="nav-item">
+                                        <span>🔑</span> Credentials <kbd style="font-size: 11px; color: #9ca3af;">⌘3</kbd>
+                                    </div>
+                                    <div class="nav-item">
+                                        <span>🔒</span> Privacy <kbd style="font-size: 11px; color: #9ca3af;">⌘4</kbd>
+                                    </div>
+                                    <div class="nav-item">
+                                        <span>📝</span> Logs <kbd style="font-size: 11px; color: #9ca3af;">⌘5</kbd>
+                                    </div>
+                                </div>
+
+                                <div class="main-content">
+                                    <div class="content-inner" style="opacity: 0.3;">
+                                        <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 16px;">Workflows</h2>
+                                        <div class="workflow-card">
+                                            <div class="workflow-title">create-feature</div>
+                                        </div>
+                                        <div class="workflow-card">
+                                            <div class="workflow-title">fix-bug</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="key-features">
+                        <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 12px;">Key Features</h3>
+                        <ul class="feature-list">
+                            <li>Command palette as primary interaction method (Cmd+K everywhere)</li>
+                            <li>All actions accessible via keyboard without mouse</li>
+                            <li>Fuzzy search across workflows, agents, credentials, logs</li>
+                            <li>Keyboard shortcuts prominently displayed on navigation and palette results</li>
+                            <li>Palette shows context-aware results (execute, view, configure)</li>
+                        </ul>
+                    </div>
+
+                    <div class="strengths-weaknesses">
+                        <div class="strength">
+                            <h4>Strengths</h4>
+                            <ul>
+                                <li>Fastest interaction for keyboard users</li>
+                                <li>Perfect for power users (Jordan persona)</li>
+                                <li>Scalable to 100+ workflows</li>
+                                <li>Follows familiar VS Code / Raycast patterns</li>
+                            </ul>
+                        </div>
+                        <div class="weakness">
+                            <h4>Trade-offs</h4>
+                            <ul>
+                                <li>Learning curve for occasional users</li>
+                                <li>Requires memorizing shortcuts for speed</li>
+                                <li>May intimidate Sam persona initially</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DIRECTION D: VS Code Familiar -->
+            <div class="direction-card">
+                <div class="direction-header" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);">
+                    <h2>Direction D: VS Code Familiar</h2>
+                    <p>Developer-native patterns with dark mode aesthetic</p>
+                </div>
+                <div class="direction-body">
+                    <div class="mockup-container">
+                        <div class="mockup-window direction-d" style="background: #1e1e1e;">
+                            <div class="window-chrome">
+                                <div class="window-buttons">
+                                    <div class="window-button close"></div>
+                                    <div class="window-button minimize"></div>
+                                    <div class="window-button maximize"></div>
+                                </div>
+                            </div>
+
+                            <div class="app-header" style="background: #252526; border-color: #3e3e42;">
+                                <div style="display: flex; align-items: center; gap: 16px;">
+                                    <div style="font-weight: 600; color: #cccccc;">~/projects/my-app</div>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <span class="privacy-badge local">
+                                        <svg class="shield-icon" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944zM11 14a1 1 0 11-2 0 1 1 0 012 0zm0-7a1 1 0 10-2 0v3a1 1 0 102 0V7z" clip-rule="evenodd"/>
+                                        </svg>
+                                        Local
+                                    </span>
+                                    <span style="font-size: 13px; color: #4ade80; font-weight: 600;">● Ollama</span>
+                                </div>
+                            </div>
+
+                            <div class="app-layout">
+                                <div class="sidebar" style="background: #252526; border-color: #3e3e42;">
+                                    <div class="nav-item active">
+                                        <span>📋</span> WORKFLOWS
+                                    </div>
+                                    <div class="nav-item">
+                                        <span>🤖</span> AGENTS
+                                    </div>
+                                    <div class="nav-item">
+                                        <span>🔑</span> CREDENTIALS
+                                    </div>
+                                    <div class="nav-item">
+                                        <span>🔒</span> PRIVACY MODE
+                                    </div>
+                                    <div class="nav-item">
+                                        <span>📝</span> LOGS
+                                    </div>
+
+                                    <div style="margin-top: 24px; padding: 12px 16px; border-top: 1px solid #3e3e42;">
+                                        <div style="font-size: 11px; color: #858585; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Recent</div>
+                                        <div style="font-size: 13px; color: #cccccc; padding: 4px 0;">create-feature</div>
+                                        <div style="font-size: 13px; color: #cccccc; padding: 4px 0;">fix-bug</div>
+                                    </div>
+                                </div>
+
+                                <div class="main-content" style="background: #1e1e1e;">
+                                    <div class="content-inner">
+                                        <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 16px; color: #cccccc;">WORKFLOWS</h2>
+
+                                        <div style="border: 1px solid #3e3e42; border-radius: 6px; margin-bottom: 12px; background: #252526;">
+                                            <div style="padding: 16px; border-bottom: 1px solid #3e3e42;">
+                                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                                    <div style="font-size: 16px; font-weight: 600; color: #cccccc;">create-feature</div>
+                                                    <button class="btn btn-primary">Run</button>
+                                                </div>
+                                                <div style="font-size: 14px; color: #858585; margin-top: 4px;">Scaffold a new feature with boilerplate and tests</div>
+                                            </div>
+                                            <div style="padding: 12px 16px; background: #1e1e1e; font-family: 'SF Mono', 'Monaco', 'Consolas', monospace; font-size: 12px; color: #858585;">
+                                                aiy workflow execute create-feature
+                                            </div>
+                                        </div>
+
+                                        <div style="border: 1px solid #3e3e42; border-radius: 6px; margin-bottom: 12px; background: #252526;">
+                                            <div style="padding: 16px; border-bottom: 1px solid #3e3e42;">
+                                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                                    <div style="font-size: 16px; font-weight: 600; color: #cccccc;">fix-bug</div>
+                                                    <button class="btn btn-primary">Run</button>
+                                                </div>
+                                                <div style="font-size: 14px; color: #858585; margin-top: 4px;">Analyze and fix reported bugs with root cause analysis</div>
+                                            </div>
+                                            <div style="padding: 12px 16px; background: #1e1e1e; font-family: 'SF Mono', 'Monaco', 'Consolas', monospace; font-size: 12px; color: #858585;">
+                                                aiy workflow execute fix-bug
+                                            </div>
+                                        </div>
+
+                                        <div style="border: 1px solid #3e3e42; border-radius: 6px; background: #252526;">
+                                            <div style="padding: 16px; border-bottom: 1px solid #3e3e42;">
+                                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                                    <div style="font-size: 16px; font-weight: 600; color: #cccccc;">refactor-component</div>
+                                                    <button class="btn btn-primary">Run</button>
+                                                </div>
+                                                <div style="font-size: 14px; color: #858585; margin-top: 4px;">Improve code structure and maintainability</div>
+                                            </div>
+                                            <div style="padding: 12px 16px; background: #1e1e1e; font-family: 'SF Mono', 'Monaco', 'Consolas', monospace; font-size: 12px; color: #858585;">
+                                                aiy workflow execute refactor-component
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="key-features">
+                        <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 12px;">Key Features</h3>
+                        <ul class="feature-list">
+                            <li>Dark mode by default (follows VS Code aesthetic)</li>
+                            <li>Terminal-friendly with actual CLI commands shown</li>
+                            <li>Activity Bar sidebar with uppercase labels</li>
+                            <li>Recent workflows section for quick access</li>
+                            <li>Monospace font for technical information</li>
+                        </ul>
+                    </div>
+
+                    <div class="strengths-weaknesses">
+                        <div class="strength">
+                            <h4>Strengths</h4>
+                            <ul>
+                                <li>Zero learning curve for VS Code users</li>
+                                <li>Reinforces "CLI as truth" by showing commands</li>
+                                <li>Professional developer aesthetic</li>
+                                <li>Excellent for technical users</li>
+                            </ul>
+                        </div>
+                        <div class="weakness">
+                            <h4>Trade-offs</h4>
+                            <ul>
+                                <li>Dark mode may not suit all preferences</li>
+                                <li>Less visual warmth/approachability</li>
+                                <li>Privacy indicators less prominent</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DIRECTION E: Dashboard-First -->
+            <div class="direction-card">
+                <div class="direction-header" style="background: linear-gradient(135deg, #ec4899 0%, #be185d 100%);">
+                    <h2>Direction E: Dashboard-First</h2>
+                    <p>At-a-glance status with metrics-driven overview</p>
+                </div>
+                <div class="direction-body">
+                    <div class="mockup-container">
+                        <div class="mockup-window direction-e">
+                            <div class="window-chrome">
+                                <div class="window-buttons">
+                                    <div class="window-button close"></div>
+                                    <div class="window-button minimize"></div>
+                                    <div class="window-button maximize"></div>
+                                </div>
+                            </div>
+
+                            <div class="app-header">
+                                <div style="display: flex; align-items: center; gap: 16px;">
+                                    <div style="font-weight: 600; color: #111827;">~/projects/my-app</div>
+                                    <span class="privacy-badge local">
+                                        <svg class="shield-icon" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944zM11 14a1 1 0 11-2 0 1 1 0 012 0zm0-7a1 1 0 10-2 0v3a1 1 0 102 0V7z" clip-rule="evenodd"/>
+                                        </svg>
+                                        Local
+                                    </span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <span style="font-size: 13px; color: #16a34a; font-weight: 600;">● Ollama Running</span>
+                                    <button class="btn btn-primary">⚙️ Settings</button>
+                                </div>
+                            </div>
+
+                            <div class="app-layout">
+                                <div class="sidebar">
+                                    <div class="nav-item active">
+                                        <span>📊</span> Dashboard
+                                    </div>
+                                    <div class="nav-item">
+                                        <span>📋</span> Workflows
+                                    </div>
+                                    <div class="nav-item">
+                                        <span>🤖</span> Agents
+                                    </div>
+                                    <div class="nav-item">
+                                        <span>🔑</span> Credentials
+                                    </div>
+                                    <div class="nav-item">
+                                        <span>🔒</span> Privacy
+                                    </div>
+                                    <div class="nav-item">
+                                        <span>📝</span> Logs
+                                    </div>
+                                </div>
+
+                                <div class="main-content">
+                                    <div class="content-inner">
+                                        <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 24px;">Dashboard</h2>
+
+                                        <div class="dashboard-grid">
+                                            <div class="dashboard-card">
+                                                <h3>Workflows Run</h3>
+                                                <div class="value">127</div>
+                                                <div style="font-size: 12px; color: #16a34a; margin-top: 4px;">↑ 12 this week</div>
+                                            </div>
+                                            <div class="dashboard-card">
+                                                <h3>Privacy Status</h3>
+                                                <div class="value" style="font-size: 20px; color: #16a34a;">Always Local</div>
+                                                <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">0 cloud requests</div>
+                                            </div>
+                                            <div class="dashboard-card">
+                                                <h3>Active Agents</h3>
+                                                <div class="value">5</div>
+                                                <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">3 custom agents</div>
+                                            </div>
+                                            <div class="dashboard-card">
+                                                <h3>Ollama Status</h3>
+                                                <div class="value" style="font-size: 20px; color: #16a34a;">● Running</div>
+                                                <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">llama3.2:latest</div>
+                                            </div>
+                                        </div>
+
+                                        <div style="margin-top: 32px;">
+                                            <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 16px;">Recent Activity</h3>
+
+                                            <div style="border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+                                                <div style="padding: 16px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
+                                                    <div>
+                                                        <div style="font-weight: 600; color: #111827;">create-feature</div>
+                                                        <div style="font-size: 13px; color: #6b7280;">Completed 2 minutes ago</div>
+                                                    </div>
+                                                    <span style="background: #dcfce7; color: #16a34a; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600;">SUCCESS</span>
+                                                </div>
+                                                <div style="padding: 16px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
+                                                    <div>
+                                                        <div style="font-weight: 600; color: #111827;">fix-bug</div>
+                                                        <div style="font-size: 13px; color: #6b7280;">Completed 1 hour ago</div>
+                                                    </div>
+                                                    <span style="background: #dcfce7; color: #16a34a; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600;">SUCCESS</span>
+                                                </div>
+                                                <div style="padding: 16px; display: flex; justify-content: space-between; align-items: center;">
+                                                    <div>
+                                                        <div style="font-weight: 600; color: #111827;">refactor-component</div>
+                                                        <div style="font-size: 13px; color: #6b7280;">Completed yesterday</div>
+                                                    </div>
+                                                    <span style="background: #fee2e2; color: #dc2626; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600;">FAILED</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div style="margin-top: 24px;">
+                                            <button class="btn btn-primary" style="font-size: 16px; padding: 12px 24px;">Execute New Workflow (⌘⇧E)</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="key-features">
+                        <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 12px;">Key Features</h3>
+                        <ul class="feature-list">
+                            <li>Dashboard home screen with key metrics (runs, privacy, health)</li>
+                            <li>At-a-glance activity feed shows recent workflow results</li>
+                            <li>Metric cards provide instant status check</li>
+                            <li>Perfect for returning users (Sam persona)</li>
+                            <li>Quick action: Execute button always visible</li>
+                        </ul>
+                    </div>
+
+                    <div class="strengths-weaknesses">
+                        <div class="strength">
+                            <h4>Strengths</h4>
+                            <ul>
+                                <li>Excellent for context recovery</li>
+                                <li>"What happened while I was away?"</li>
+                                <li>Privacy metrics build confidence</li>
+                                <li>Good for occasional users</li>
+                            </ul>
+                        </div>
+                        <div class="weakness">
+                            <h4>Trade-offs</h4>
+                            <ul>
+                                <li>Extra click to reach workflows</li>
+                                <li>Dashboard adds complexity</li>
+                                <li>Less direct than workflow-first</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DIRECTION F: Log-Transparent -->
+            <div class="direction-card">
+                <div class="direction-header" style="background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);">
+                    <h2>Direction F: Log-Transparent</h2>
+                    <p>Real-time execution with streaming logs as primary UI</p>
+                </div>
+                <div class="direction-body">
+                    <div class="mockup-container">
+                        <div class="mockup-window direction-f">
+                            <div class="window-chrome">
+                                <div class="window-buttons">
+                                    <div class="window-button close"></div>
+                                    <div class="window-button minimize"></div>
+                                    <div class="window-button maximize"></div>
+                                </div>
+                            </div>
+
+                            <div class="app-header">
+                                <div style="display: flex; align-items: center; gap: 16px;">
+                                    <div style="font-weight: 600; color: #111827;">~/projects/my-app</div>
+                                    <span class="privacy-badge local">
+                                        <svg class="shield-icon" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944zM11 14a1 1 0 11-2 0 1 1 0 012 0zm0-7a1 1 0 10-2 0v3a1 1 0 102 0V7z" clip-rule="evenodd"/>
+                                        </svg>
+                                        Local
+                                    </span>
+                                    <span class="status-badge running">create-feature running...</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <button style="background: #fee2e2; color: #dc2626; padding: 8px 16px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;">Cancel (⌘.)</button>
+                                </div>
+                            </div>
+
+                            <div class="app-layout">
+                                <div class="sidebar">
+                                    <div class="nav-item">
+                                        <span>📋</span> Workflows
+                                    </div>
+                                    <div class="nav-item">
+                                        <span>🤖</span> Agents
+                                    </div>
+                                    <div class="nav-item">
+                                        <span>🔑</span> Credentials
+                                    </div>
+                                    <div class="nav-item">
+                                        <span>🔒</span> Privacy
+                                    </div>
+                                    <div class="nav-item active">
+                                        <span>📝</span> Logs
+                                    </div>
+                                </div>
+
+                                <div class="main-content" style="background: #fafafa;">
+                                    <div style="padding: 0;">
+                                        <!-- Logs Toolbar with Filter/Search Controls -->
+                                        <div style="background: white; border-bottom: 1px solid #e5e7eb; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center;">
+                                            <div style="display: flex; gap: 12px; align-items: center;">
+                                                <div style="font-weight: 600; color: #111827;">Real-time Execution Log</div>
+                                                <!-- Log Filter Dropdown -->
+                                                <select style="padding: 6px 10px; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 13px; cursor: pointer; color: #374151;">
+                                                    <option value="all">Filter: All</option>
+                                                    <option value="info">Info</option>
+                                                    <option value="warn">Warn</option>
+                                                    <option value="error">Error</option>
+                                                </select>
+                                                <!-- Log Search Input -->
+                                                <input type="text" placeholder="Search logs..." style="padding: 6px 10px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 13px; width: 180px; color: #374151;">
+                                            </div>
+                                            <div style="display: flex; gap: 8px; align-items: center;">
+                                                <label style="font-size: 13px; color: #6b7280; display: flex; align-items: center; gap: 6px;">
+                                                    <input type="checkbox" checked> Auto-scroll
+                                                </label>
+                                                <button style="padding: 6px 12px; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 13px; cursor: pointer;">Copy Log</button>
+                                                <button style="padding: 6px 12px; background: #dbeafe; border: 1px solid #93c5fd; border-radius: 4px; font-size: 13px; cursor: pointer; color: #1e40af; font-weight: 500;">Copy CLI Command (redacted)</button>
+                                            </div>
+                                        </div>
+
+                                        <div style="height: 488px; overflow-y: auto; font-family: 'SF Mono', 'Monaco', 'Consolas', monospace; font-size: 13px;">
+                                            <div class="log-entry">
+                                                <span class="log-timestamp">14:32:01</span>
+                                                <span class="log-level info">INFO</span>
+                                                <span>Workflow 'create-feature' starting...</span>
+                                            </div>
+                                            <div class="log-entry">
+                                                <span class="log-timestamp">14:32:01</span>
+                                                <span class="log-level info">INFO</span>
+                                                <span>CLI: aiy workflow execute create-feature</span>
+                                            </div>
+                                            <div class="log-entry">
+                                                <span class="log-timestamp">14:32:02</span>
+                                                <span class="log-level info">INFO</span>
+                                                <span>[PRIVACY] Running privacy check...</span>
+                                            </div>
+                                            <div class="log-entry">
+                                                <span class="log-timestamp">14:32:03</span>
+                                                <span class="log-level info">INFO</span>
+                                                <span>[PASS] Privacy verification passed - 100% local</span>
+                                            </div>
+                                            <div class="log-entry">
+                                                <span class="log-timestamp">14:32:04</span>
+                                                <span class="log-level info">INFO</span>
+                                                <span>Analyzing project structure...</span>
+                                            </div>
+                                            <div class="log-entry">
+                                                <span class="log-timestamp">14:32:05</span>
+                                                <span class="log-level info">INFO</span>
+                                                <span>Found 47 source files</span>
+                                            </div>
+                                            <div class="log-entry">
+                                                <span class="log-timestamp">14:32:06</span>
+                                                <span class="log-level info">INFO</span>
+                                                <span>Agent: feature-scaffolder initialized</span>
+                                            </div>
+                                            <div class="log-entry">
+                                                <span class="log-timestamp">14:32:08</span>
+                                                <span class="log-level info">INFO</span>
+                                                <span>Generating boilerplate for new feature...</span>
+                                            </div>
+                                            <div class="log-entry">
+                                                <span class="log-timestamp">14:32:10</span>
+                                                <span class="log-level info">INFO</span>
+                                                <span>Created: src/features/NewFeature.tsx</span>
+                                            </div>
+                                            <div class="log-entry">
+                                                <span class="log-timestamp">14:32:11</span>
+                                                <span class="log-level info">INFO</span>
+                                                <span>Created: src/features/NewFeature.test.tsx</span>
+                                            </div>
+                                            <div class="log-entry">
+                                                <span class="log-timestamp">14:32:12</span>
+                                                <span class="log-level info">INFO</span>
+                                                <span>Updated: src/features/index.ts</span>
+                                            </div>
+                                            <div class="log-entry" style="background: rgba(59, 130, 246, 0.05); border-left: 3px solid #3b82f6;">
+                                                <span class="log-timestamp">14:32:13</span>
+                                                <span class="log-level info">INFO</span>
+                                                <span>▶ Running verification tests...</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="key-features">
+                        <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 12px;">Key Features</h3>
+                        <ul class="feature-list">
+                            <li>Real-time streaming log output as primary UI during execution</li>
+                            <li>Privacy verification events inline with execution ([PASS]/[FAIL] markers)</li>
+                            <li>Structured log entries with timestamps, levels, and messages</li>
+                            <li>Auto-scroll option to follow execution in real-time</li>
+                            <li>Cancel button always visible during workflow runs</li>
+                        </ul>
+                    </div>
+
+                    <div class="strengths-weaknesses">
+                        <div class="strength">
+                            <h4>Strengths</h4>
+                            <ul>
+                                <li>Maximum transparency (trust through visibility)</li>
+                                <li>Perfect for debugging and auditing</li>
+                                <li>Matches CLI behavior (familiar to terminal users)</li>
+                                <li>Privacy checks visible in timeline</li>
+                            </ul>
+                        </div>
+                        <div class="weakness">
+                            <h4>Trade-offs</h4>
+                            <ul>
+                                <li>Can be overwhelming with verbose logs</li>
+                                <li>Requires filtering for long executions</li>
+                                <li>Less visual polish than other directions</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary and Recommendation Section -->
+        <div style="background: white; padding: 32px; border-radius: 12px; margin-top: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 16px;">Recommendation & Next Steps</h2>
+
+            <div style="background: #f0fdf4; border-left: 4px solid #16a34a; padding: 16px; border-radius: 6px; margin-bottom: 24px;">
+                <div style="font-weight: 700; color: #15803d; margin-bottom: 8px;">Recommended Combined Approach:</div>
+                <div style="color: #166534;">
+                    Based on our "Trust + Speed" goal and the 3 personas (Alex, Jordan, Sam), I recommend <strong>combining elements from Direction B (Workflow-Centric) + Direction C (Command Palette Native) + Direction A (Privacy-First)</strong>:
+                    <ul style="margin-top: 12px; padding-left: 20px;">
+                        <li><strong>Direction B layout</strong> - workflow cards as heroes for fast scanning</li>
+                        <li><strong>Direction C keyboard-first</strong> - Cmd+K command palette for power users</li>
+                        <li><strong>Direction A privacy</strong> - persistent privacy badge + inline verification</li>
+                        <li><strong>Direction F transparency</strong> - real-time log view during execution</li>
+                    </ul>
+                </div>
+            </div>
+
+            <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 12px;">Design Direction Decision Matrix</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 14px;">
+                <thead>
+                    <tr style="background: #f3f4f6;">
+                        <th style="padding: 12px; text-align: left; border: 1px solid #e5e7eb;">Direction</th>
+                        <th style="padding: 12px; text-align: left; border: 1px solid #e5e7eb;">Best For Persona</th>
+                        <th style="padding: 12px; text-align: left; border: 1px solid #e5e7eb;">Trust Score</th>
+                        <th style="padding: 12px; text-align: left; border: 1px solid #e5e7eb;">Speed Score</th>
+                        <th style="padding: 12px; text-align: left; border: 1px solid #e5e7eb;">Learning Curve</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb; font-weight: 600;">A: Privacy-First</td>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;">Alex (Security)</td>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;">⭐⭐⭐⭐⭐</td>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;">⭐⭐⭐</td>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;">Low</td>
+                    </tr>
+                    <tr style="background: #fafafa;">
+                        <td style="padding: 12px; border: 1px solid #e5e7eb; font-weight: 600;">B: Workflow-Centric</td>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;">Jordan (Power)</td>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;">⭐⭐⭐</td>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;">⭐⭐⭐⭐⭐</td>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;">Low</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb; font-weight: 600;">C: Command Palette</td>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;">Jordan (Power)</td>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;">⭐⭐⭐</td>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;">⭐⭐⭐⭐⭐</td>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;">Medium</td>
+                    </tr>
+                    <tr style="background: #fafafa;">
+                        <td style="padding: 12px; border: 1px solid #e5e7eb; font-weight: 600;">D: VS Code Familiar</td>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;">Jordan (Power)</td>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;">⭐⭐⭐</td>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;">⭐⭐⭐⭐</td>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;">Very Low</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb; font-weight: 600;">E: Dashboard-First</td>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;">Sam (Occasional)</td>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;">⭐⭐⭐⭐</td>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;">⭐⭐⭐</td>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;">Low</td>
+                    </tr>
+                    <tr style="background: #fafafa;">
+                        <td style="padding: 12px; border: 1px solid #e5e7eb; font-weight: 600;">F: Log-Transparent</td>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;">Alex (Security)</td>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;">⭐⭐⭐⭐⭐</td>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;">⭐⭐⭐</td>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;">Low</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 12px;">Questions for You</h3>
+            <ol style="padding-left: 20px; line-height: 1.8;">
+                <li><strong>Which direction(s) best align with your vision?</strong> You can choose one direction, or ask me to combine elements from multiple.</li>
+                <li><strong>Privacy emphasis:</strong> Should privacy indicators be as prominent as Direction A, or more subtle like Direction B?</li>
+                <li><strong>Target persona priority:</strong> If you had to prioritize one persona (Alex/Jordan/Sam), which would it be?</li>
+                <li><strong>Dark mode:</strong> Should dark mode be default (Direction D), optional, or light-only for v1?</li>
+            </ol>
+        </div>
+    </div>
+</body>
+</html>

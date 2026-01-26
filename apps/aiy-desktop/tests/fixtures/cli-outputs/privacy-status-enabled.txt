@@ -1,0 +1,27 @@
+Privacy Mode Status
+===================
+
+Status: [ENABLED]
+
+Local Executor:
+  Ollama URL: http://127.0.0.1:11434
+  Model: qwen2.5-coder:14b
+  Context size: 32768 tokens
+  Timeout: 120000ms
+
+RAG Settings:
+  Token budget: 4096 tokens
+  Top-k results: 10
+  Min similarity: 0.70
+
+Verification Limits:
+  Max fmt repairs: 3
+  Max clippy repairs: 3
+  Max test repairs: 3
+  Max global repairs: 10
+
+Exclude Patterns:
+  - target/**
+  - node_modules/**
+  - .git/**
+  - *.lock

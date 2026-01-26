@@ -1,0 +1,10 @@
+Agent Credential Status
+=======================
+
+[OK] Grok (xAI) - Ready
+[!] Claude (Anthropic) - Missing credentials
+    Set with: aiy credentials set anthropic
+[!] Gemini (Google) - Missing credentials
+    Set with: aiy credentials set google
+
+[OK] 1 of 3 enabled agents ready
